@@ -1979,6 +1979,54 @@ footer {
   min-height: 1.1em;
   margin: -2px 0 4px;
 }
+/* ===== 联机对战：模式选择 / 多人房间 ===== */
+.p2p-mode-grid {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 14px 0;
+}
+.p2p-mode-grid .btn {
+  flex: 1;
+  max-width: 180px;
+}
+.p2p-create {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+.p2p-create select {
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 38vh;
+  overflow-y: auto;
+  margin: 12px 0;
+  text-align: left;
+}
+.room-mem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
 @media (max-width: 1024px) {
   .home-grid {
     grid-template-columns: 1fr;
