@@ -1,23 +1,37 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
     <title>WORD RUSH · 单词快打 — 多教材·多词库</title>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="src/style.css" />
   </head>
   <body data-theme="board">
     <div id="amb"></div>
     <!-- ═══ 顶部 HUD ═══ -->
     <header>
-      <div><span class="lg-en">WORD RUSH</span><span class="lg-cn">单词快打 · 多教材词汇特训</span></div>
+      <div>
+        <span class="lg-en">WORD RUSH</span
+        ><span class="lg-cn">单词快打 · 多教材词汇特训</span>
+      </div>
       <div class="hstats">
         <div class="hcoin" id="hCoin">🪙 <b id="coinN">0</b></div>
-        <div class="hlv"><span class="lvbadge" id="lvBadge">LV 1</span><div class="xpwrap"><i id="xpBar"></i></div><span class="lvname" id="lvName">单词新手</span></div>
-        <button class="iconbtn" id="btnOsk" title="屏幕键盘：自动/开/关">🎹</button>
+        <div class="hlv">
+          <span class="lvbadge" id="lvBadge">LV 1</span>
+          <div class="xpwrap"><i id="xpBar"></i></div>
+          <span class="lvname" id="lvName">单词新手</span>
+        </div>
+        <button class="iconbtn" id="btnOsk" title="屏幕键盘：自动/开/关">
+          🎹
+        </button>
         <button class="iconbtn" id="btnSound" title="音效开关">🔔</button>
         <button class="iconbtn" id="btnTts" title="单词朗读开关">🔊</button>
       </div>
@@ -31,57 +45,192 @@
               <h2 class="sec">📚 词库闯关 · 多版本同步</h2>
               <div class="bktabs" id="bkTabs"></div>
               <div class="hero-top">
-                <div><div class="hero-name" id="heroName"></div><div class="hero-meta" id="heroMeta"></div></div>
+                <div>
+                  <div class="hero-name" id="heroName"></div>
+                  <div class="hero-meta" id="heroMeta"></div>
+                </div>
                 <span class="tag" id="heroTag"></span>
               </div>
-              <div id="todayStats" style="font-size:.8rem;color:var(--sub);margin:6px 0 0;padding:6px 10px;background:var(--panel);border-radius:8px;display:flex;flex-wrap:wrap;gap:12px;"></div>
+              <div
+                id="todayStats"
+                style="
+                  font-size: 0.8rem;
+                  color: var(--sub);
+                  margin: 6px 0 0;
+                  padding: 6px 10px;
+                  background: var(--panel);
+                  border-radius: 8px;
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 12px;
+                "
+              ></div>
               <div class="lvmap" id="lvMap"></div>
               <button class="btn solid" id="btnStart">▶ 开始闯关</button>
-              <button class="btn b sm" onclick="showShareModal()">📤 分享挑战</button>
-              <button class="btn c sm" onclick="showAchievementModal()">🏆 成就榜</button>
+              <button class="btn b sm" onclick="showShareModal()">
+                📤 分享挑战
+              </button>
+              <button class="btn c sm" onclick="showAchievementModal()">
+                🏆 成就榜
+              </button>
             </div>
             <div class="sci-strip">
-              <div class="sci"><b>🧠 艾宾浩斯曲线</b>系统按遗忘规律自动排定复习任务，越熟的词、间隔越长。</div>
-              <div class="sci"><b>🔗 词性 + 短语联想</b>过关时展示中文释义、词性与关联短语，用语境加深记忆。</div>
-              <div class="sci"><b>🔁 间隔重复</b>每个词经历 陌生→初识→熟悉→掌握→牢固→永久 六个阶段。</div>
+              <div class="sci">
+                <b>🧠 艾宾浩斯曲线</b
+                >系统按遗忘规律自动排定复习任务，越熟的词、间隔越长。
+              </div>
+              <div class="sci">
+                <b>🔗 词性 + 短语联想</b
+                >过关时展示中文释义、词性与关联短语，用语境加深记忆。
+              </div>
+              <div class="sci">
+                <b>🔁 间隔重复</b>每个词经历 陌生→初识→熟悉→掌握→牢固→永久
+                六个阶段。
+              </div>
             </div>
             <div class="duo">
-              <div class="minip"><h4>📌 今日复习任务</h4><div class="num" id="dueN">0</div><p id="dueTxt">根据遗忘曲线，这些词该见面了</p><button class="btn c sm" id="btnReview">开始复习</button></div>
-              <div class="minip"><h4>✏️ 我的错题本</h4><div class="num" id="wrongN">0</div><p>拼错过的词，集中歼灭</p>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <div class="minip">
+                <h4>📌 今日复习任务</h4>
+                <div class="num" id="dueN">0</div>
+                <p id="dueTxt">根据遗忘曲线，这些词该见面了</p>
+                <button class="btn c sm" id="btnReview">开始复习</button>
+              </div>
+              <div class="minip">
+                <h4>✏️ 我的错题本</h4>
+                <div class="num" id="wrongN">0</div>
+                <p>拼错过的词，集中歼灭</p>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap">
                   <button class="btn p sm" id="btnWrong">错题重练</button>
-                  <button class="btn sm" style="border-color:var(--c-p);color:var(--c-p);" onclick="showWrongList()">📖 查看错题</button>
+                  <button
+                    class="btn sm"
+                    style="border-color: var(--c-p); color: var(--c-p)"
+                    onclick="showWrongList()"
+                  >
+                    📖 查看错题
+                  </button>
                 </div>
               </div>
             </div>
           </div>
           <div class="col-side">
-            <button class="mode" style="--mc:#ff8fb3" onclick="openMode('memory')"><span class="ic">🌸</span><span><h3>花瓣记忆 <small>PETAL MEMORY</small></h3><p>florr 风：逐字母拼读 → 隐藏 → 回忆拼写</p></span></button>
-            <button class="mode" style="--mc:var(--c-c)" onclick="openMode('time')"><span class="ic">⏱️</span><span><h3>限时冲刺 <small>TIME RUSH</small></h3><p>60 秒极限手速，连击翻倍得分</p></span></button>
-            <button class="mode" style="--mc:var(--c-p)" onclick="openMode('fall')"><span class="ic">☄️</span><span><h3>陨石单词 <small>WORD FALL</small></h3><p>单词坠落，拼完即击碎，护住底线</p></span></button>
-            <button class="mode" style="--mc:var(--c-y)" onclick="openMode('battle')"><span class="ic">⚔️</span><span><h3>对战竞技场 <small>PVP ARENA</small></h3><p>人机竞速 / 双人同屏轮流 PK</p></span></button>
-            <button class="mode" style="--mc:var(--ok)" onclick="go('scr-table')"><span class="ic">📋</span><span><h3>单词表 <small>WORD LIST</small></h3><p>各单元单词 · 学习情况与统计，便于查阅复习</p></span></button>
+            <button
+              class="mode"
+              style="--mc: #ff8fb3"
+              onclick="openMode('memory')"
+            >
+              <span class="ic">🌸</span
+              ><span
+                ><h3>花瓣记忆 <small>PETAL MEMORY</small></h3>
+                <p>florr 风：逐字母拼读 → 隐藏 → 回忆拼写</p></span
+              >
+            </button>
+            <button
+              class="mode"
+              style="--mc: var(--c-c)"
+              onclick="openMode('time')"
+            >
+              <span class="ic">⏱️</span
+              ><span
+                ><h3>限时冲刺 <small>TIME RUSH</small></h3>
+                <p>60 秒极限手速，连击翻倍得分</p></span
+              >
+            </button>
+            <button
+              class="mode"
+              style="--mc: var(--c-p)"
+              onclick="openMode('fall')"
+            >
+              <span class="ic">☄️</span
+              ><span
+                ><h3>陨石单词 <small>WORD FALL</small></h3>
+                <p>单词坠落，拼完即击碎，护住底线</p></span
+              >
+            </button>
+            <button
+              class="mode"
+              style="--mc: var(--c-y)"
+              onclick="openMode('battle')"
+            >
+              <span class="ic">⚔️</span
+              ><span
+                ><h3>对战竞技场 <small>PVP ARENA</small></h3>
+                <p>人机竞速 / 双人同屏轮流 PK</p></span
+              >
+            </button>
+            <button
+              class="mode"
+              style="--mc: var(--ok)"
+              onclick="go('scr-table')"
+            >
+              <span class="ic">📋</span
+              ><span
+                ><h3>单词表 <small>WORD LIST</small></h3>
+                <p>各单元单词 · 学习情况与统计，便于查阅复习</p></span
+              >
+            </button>
             <div class="mini-row">
-              <button class="mode" style="--mc:var(--c-b)" onclick="go('scr-book')"><span class="ic">📖</span><span><h3>单词本</h3><p>按单元浏览词表</p></span></button>
-              <button class="mode" style="--mc:var(--c-p)" onclick="go('scr-shop')"><span class="ic">🛒</span><span><h3>奖励商店</h3><p>主题与道具</p></span></button>
+              <button
+                class="mode"
+                style="--mc: var(--c-b)"
+                onclick="go('scr-book')"
+              >
+                <span class="ic">📖</span
+                ><span
+                  ><h3>单词本</h3>
+                  <p>按单元浏览词表</p></span
+                >
+              </button>
+              <button
+                class="mode"
+                style="--mc: var(--c-p)"
+                onclick="go('scr-shop')"
+              >
+                <span class="ic">🛒</span
+                ><span
+                  ><h3>奖励商店</h3>
+                  <p>主题与道具</p></span
+                >
+              </button>
             </div>
-            <button class="mode" style="--mc:#7c4dff;border-color:#7c4dff;" onclick="openP2PMode()"><span class="ic">🌐</span><span><h3>联机对战 <small>P2P ARENA</small></h3><p>PeerJS 实时对战 · 创建/加入房间</p></span></button>
+            <button
+              class="mode"
+              style="--mc: #7c4dff; border-color: #7c4dff"
+              onclick="openP2PMode()"
+            >
+              <span class="ic">🌐</span
+              ><span
+                ><h3>联机对战 <small>P2P ARENA</small></h3>
+                <p>PeerJS 实时对战 · 创建/加入房间</p></span
+              >
+            </button>
           </div>
         </div>
       </section>
 
-      <section id="scr-game" class="scr"><div id="arenaWrap"></div><div id="osk"></div></section>
+      <section id="scr-game" class="scr">
+        <div id="arenaWrap"></div>
+        <div id="osk"></div>
+      </section>
 
       <section id="scr-book" class="scr">
         <button class="back" onclick="go('scr-home')">← 返回主页</button>
         <h2 class="sec">📖 单词本 · 按单元浏览</h2>
         <div class="toolbar">
-          <input id="bkSearch" placeholder="搜索单词 / 中文…" style="flex:1;min-width:140px">
+          <input
+            id="bkSearch"
+            placeholder="搜索单词 / 中文…"
+            style="flex: 1; min-width: 140px"
+          />
           <select id="bkBook"></select>
-          <select id="bkLv"><option value="all">全部状态</option><option value="new">未学习</option><option value="ing">学习中</option><option value="max">已牢记</option></select>
+          <select id="bkLv">
+            <option value="all">全部状态</option>
+            <option value="new">未学习</option>
+            <option value="ing">学习中</option>
+            <option value="max">已牢记</option>
+          </select>
         </div>
-        <div class="panel" style="padding:6px 10px" id="wbList"></div>
-        <h2 class="sec" style="margin-top:30px">🏅 成就墙</h2>
+        <div class="panel" style="padding: 6px 10px" id="wbList"></div>
+        <h2 class="sec" style="margin-top: 30px">🏅 成就墙</h2>
         <div class="achgrid" id="achGrid"></div>
       </section>
 
@@ -89,11 +238,21 @@
         <button class="back" onclick="go('scr-home')">← 返回主页</button>
         <h2 class="sec">📋 单词表 · 单元学习情况与统计</h2>
         <div class="tstats" id="tStats"></div>
-        <div class="toolbar"><div class="bktabs" id="tTabs" style="margin:0;width:100%"></div></div>
         <div class="toolbar">
-          <input id="tSearch" placeholder="在当前词书中搜索…" style="flex:1;min-width:140px">
+          <div class="bktabs" id="tTabs" style="margin: 0; width: 100%"></div>
+        </div>
+        <div class="toolbar">
+          <input
+            id="tSearch"
+            placeholder="在当前词书中搜索…"
+            style="flex: 1; min-width: 140px"
+          />
           <select id="tFilter">
-            <option value="all">全部单词</option><option value="due">⏰ 待复习</option><option value="wrong">✏️ 需巩固（拼错过）</option><option value="max">🏆 已掌握</option><option value="new">🌱 未学习</option>
+            <option value="all">全部单词</option>
+            <option value="due">⏰ 待复习</option>
+            <option value="wrong">✏️ 需巩固（拼错过）</option>
+            <option value="max">🏆 已掌握</option>
+            <option value="new">🌱 未学习</option>
           </select>
         </div>
         <div id="tBody"></div>
@@ -108,20 +267,19 @@
       </section>
     </main>
 
-  <footer>词库：人教版（9册）· 外研版（新标准）· 新概念第一册 · KET · 四级 · 六级 · 持续扩充中</footer>
-  <div id="toasts"></div>
-  <div id="fx"></div>
-  <div class="modal hide" id="modal"><div class="mbox paper" id="mbox"></div></div>
-
-
-<script src="src/main.js"></script>
-
-<!--
-<script src="src/data.js"></script>
-<script src="src/core.js"></script>
-<script src="src/games.js"></script>
-<script defer src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
--->
-</body>
-
+    <footer>
+      词库：人教版（9册）· 外研版（新标准）· 新概念第一册 · KET · 四级 · 六级 ·
+      持续扩充中
+    </footer>
+    <div id="toasts"></div>
+    <div id="fx"></div>
+    <div class="modal hide" id="modal">
+      <div class="mbox paper" id="mbox"></div>
+    </div>
+    <script src="src/main.js"></script>
+    <script
+      defer
+      src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
+    ></script>
+  </body>
 </html>
