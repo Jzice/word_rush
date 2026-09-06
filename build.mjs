@@ -11,7 +11,9 @@ const html = readFileSync(join(root, "index.html"), "utf8")
   .replace(/<script src="\/?src\/core\.js"><\/script>/,
     () => `<script>\n${readFileSync(join(root, "src/core.js"), "utf8")}\n</script>`)
   .replace(/<script src="\/?src\/games\.js"><\/script>/,
-    () => `<script>\n${readFileSync(join(root, "src/games.js"), "utf8")}\n</script>`);
+    () => `<script>\n${readFileSync(join(root, "src/games.js"), "utf8")}\n</script>`)
+  .replace(/<script src="\/?src\/main\.js"><\/script>/,
+    () => `<script>\n${readFileSync(join(root, "src/main.js"), "utf8")}\n</script>`);
 
 mkdirSync(join(root, "dist"), { recursive: true });
 writeFileSync(join(root, "dist/word_rush.html"), html, "utf8");
