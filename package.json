@@ -5,6 +5,11 @@
   "description": "WORD RUSH 单词快打 · 多教材多词库词汇特训（单文件发布）",
   "scripts": {
     "dev": "npx serve .",
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "build:dev": "node build.mjs --dev"
+  },
+  "devDependencies": {
+    "clean-css": "^5.3.3",
+    "terser": "^5.51.2"
   }
 }

@@ -5,7 +5,8 @@ WORD RUSH 单词快打 — vanilla JS single-page vocabulary typing game (multip
 ## Commands
 
 - `npm run dev` — `npx serve .` serves the repo root; `index.html` loads `src/main.js` + `src/style.css` directly (no build needed to develop)
-- `npm run build` — `node build.mjs` inlines CSS/JS into single `dist/word_rush.html` (gitignored)
+- `npm run build` — `node build.mjs` inlines CSS/JS into single `dist/word_rush.html` (gitignored), **minified + obfuscated** via terser (`mangle` local names) + clean-css
+- `npm run build:dev` — same inlining **without** minification/obfuscation (debug-friendly; readable source in the bundle)
 - No lint / typecheck / test scripts exist. Verify changes with `npm run build` + browser testing (e.g. Playwright) — nothing else validates the code.
 
 ## Architecture
@@ -19,6 +20,7 @@ WORD RUSH 单词快打 — vanilla JS single-page vocabulary typing game (multip
 
 - **Classic script, not a module.** Top-level `function` declarations become globals usable from inline `onclick`, but top-level `const`/`let` do NOT. Arrow functions referenced from `index.html` inline handlers MUST be explicitly attached: `window.foo = () => {...}` (see `window.useTheme`/`window.buyItem` near the end of `main.js`).
 - **Build inlining is regex-based.** `build.mjs` only substitutes the exact tag patterns `<link ... href="src/style.css">` and `<script src="src/main.js"></script>` (a leading `/` is tolerated). Rename a file, add attributes, or change the path → build silently outputs a broken `dist/word_rush.html`. Keep those two tags byte-for-byte as-is.
+- **Obfuscation keeps top-level names.** terser runs with `mangle.toplevel: false` (default) — top-level `function` declarations and `window.x` property names are preserved so inline `onclick` keeps working. Only local names inside functions get mangled. If you ever add a script-level rename/obfuscation step, verify inline `onclick` handlers still resolve.
 - **Built file is not fully offline.** Google Fonts and PeerJS (from `unpkg`) stay as external CDN refs in `dist/word_rush.html` — custom fonts and P2P 联机对战 need network at runtime.
 - **Single global `keydown` listener** (`src/main.js:2082`). During gameplay every printable char routes through `routeChar(ch)` → per-mode handler by `G.type`. A new game mode must branch in `routeChar` and manage the `G` object. On the home screen, keys 1-9 select units and r/w/m/t/f/b/l/p/s shortcut screens. Input is ignored when focus is in `INPUT|SELECT|TEXTAREA`.
 - **Persistence is manual.** State lives in localStorage under key `wordrush_v1` (`const K`), schema in `def()` (`src/main.js:1061`). Any mutation must call `save()` explicitly. Word mastery is keyed by `word.toLowerCase()` in `S.mastery` — renaming a word in `BOOKS` orphans its progress (there is no migration path).
