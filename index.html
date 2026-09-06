@@ -34,6 +34,7 @@
         </button>
         <button class="iconbtn" id="btnSound" title="音效开关">🔔</button>
         <button class="iconbtn" id="btnTts" title="单词朗读开关">🔊</button>
+        <button class="iconbtn" id="btnProfile" title="个人资料">👤</button>
       </div>
     </header>
 
@@ -151,11 +152,22 @@
               style="--mc: var(--c-y)"
               onclick="openMode('battle')"
             >
-              <span class="ic">⚔️</span
-              ><span
-                ><h3>对战竞技场 <small>PVP ARENA</small></h3>
-                <p>人机竞速 / 双人同屏轮流 PK</p></span
-              >
+              <span class="ic">⚔️</span>
+              <span>
+                <h3>对战竞技场 <small>PVP ARENA</small></h3>
+                <p>人机竞速 / 双人同屏轮流 PK</p>
+              </span>
+            </button>
+            <button
+              class="mode"
+              style="--mc: #7c4dff;"
+              onclick="openP2PMode()"
+            >
+              <span class="ic">🌐</span>
+              <span>
+                <h3>联机对战 <small>P2P ARENA</small></h3>
+                <p>PeerJS 实时对战 · 创建/加入房间</p>
+              </span>
             </button>
             <button
               class="mode"
@@ -192,17 +204,6 @@
                 >
               </button>
             </div>
-            <button
-              class="mode"
-              style="--mc: #7c4dff; border-color: #7c4dff"
-              onclick="openP2PMode()"
-            >
-              <span class="ic">🌐</span
-              ><span
-                ><h3>联机对战 <small>P2P ARENA</small></h3>
-                <p>PeerJS 实时对战 · 创建/加入房间</p></span
-              >
-            </button>
           </div>
         </div>
       </section>
@@ -277,9 +278,6 @@
       <div class="mbox paper" id="mbox"></div>
     </div>
     <script src="src/main.js"></script>
-    <script
-      defer
-      src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
-    ></script>
+    <script defer src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   </body>
 </html>

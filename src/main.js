@@ -1080,6 +1080,13 @@ function def() {
       unitsCleared: 0,
     },
     set: { sound: true, tts: true, osk: "auto", wordOrder: "random" },
+    profile: {
+      name: "",
+      gender: "保密",
+      avatar: "🧑",
+      mood: "",
+      moodEmoji: "😀",
+    },
     daily: {},
   };
 }
@@ -1091,6 +1098,10 @@ try {
   S.set = Object.assign(
     { sound: true, tts: true, osk: "auto", wordOrder: "random" },
     S.set
+  );
+  S.profile = Object.assign(
+    { name: "", gender: "保密", avatar: "🧑", mood: "", moodEmoji: "😀" },
+    S.profile
   );
   if (!S.daily) S.daily = {};
 } catch (e) {
@@ -1692,6 +1703,67 @@ function closeModal() {
 }
 window.closeModal = closeModal;
 
+/* ================= 个人资料 ================= */
+let pfBack = null, // 从联机对战入口进入资料页，保存后返回
+  pfDraft = {};
+const PF_AVATARS = ["🧑", "👩", "👨", "🧔", "👧", "👦", "🦊", "🐼", "🐯", "🐸", "🤖", "👻"],
+  PF_MOODS = ["😀", "😄", "😎", "🥳", "😤", "😴", "🤔", "😢", "😭", "🤯", "💪", "🔥"];
+$("#btnProfile").onclick = () => openProfileModal();
+function openProfileModal() {
+  pfDraft = Object.assign(
+    { name: "", gender: "保密", avatar: "🧑", mood: "", moodEmoji: "😀" },
+    S.profile || {}
+  );
+  const avHtml = PF_AVATARS.map(
+    (e) =>
+      `<button class="emopick ${pfDraft.avatar === e ? "on" : ""}" data-k="avatar" data-v="${e}" onclick="pfPick(this)">${e}</button>`
+  ).join("");
+  const moodHtml = PF_MOODS.map(
+    (e) =>
+      `<button class="emopick ${pfDraft.moodEmoji === e ? "on" : ""}" data-k="moodEmoji" data-v="${e}" onclick="pfPick(this)">${e}</button>`
+  ).join("");
+  openModal(
+    `<h3>👤 个人资料</h3><div class="sub">设置后将展示在联机对战中对方面前</div>
+  <div class="pf-row"><label>姓名</label><input class="pf-input" id="pfName" placeholder="输入昵称（最多 12 字）" maxlength="12" value="${escA(pfDraft.name)}"></div>
+  <div class="pf-row"><label>性别</label><div class="pf-seg">${["男", "女", "保密"]
+    .map(
+      (g) =>
+        `<button class="seg ${pfDraft.gender === g ? "on" : ""}" data-k="gender" data-v="${g}" onclick="pfPick(this)">${g}</button>`
+    )
+    .join("")}</div></div>
+  <div class="pf-row"><label>头像</label><div class="emogrid">${avHtml}</div></div>
+  <div class="pf-row"><label>一句话心情</label><input class="pf-input" id="pfMood" placeholder="例如：今天也要加油！" maxlength="20" value="${escA(pfDraft.mood)}"></div>
+  <div class="pf-row"><label>心情表情</label><div class="emogrid">${moodHtml}</div></div>
+  <div class="mbtns"><button class="btn y" onclick="saveProfile()">💾 保存</button><button class="btn" style="border-color:#999;color:#666" onclick="closeModal()">取消</button></div>`
+  );
+}
+function pfPick(el) {
+  const k = el.dataset.k,
+    v = el.dataset.v;
+  if (!k) return;
+  pfDraft[k] = v;
+  el.parentElement
+    .querySelectorAll(".emopick,.seg")
+    .forEach((b) => b.classList.toggle("on", b === el));
+}
+function saveProfile() {
+  pfDraft.name = ($("#pfName")?.value || "").trim().slice(0, 12);
+  pfDraft.mood = ($("#pfMood")?.value || "").trim().slice(0, 20);
+  if (!pfDraft.avatar) pfDraft.avatar = "🧑";
+  if (!pfDraft.moodEmoji) pfDraft.moodEmoji = "😀";
+  S.profile = Object.assign({}, pfDraft);
+  save();
+  const back = pfBack;
+  pfBack = null;
+  closeModal();
+  toast("👤 资料已保存");
+  if (back === "p2p") openP2PMode();
+}
+function openProfileFromP2P() {
+  pfBack = "p2p";
+  openProfileModal();
+}
+
 /* ================= 错题查看 ================= */
 window.showWrongList = function () {
   const list = wrongWords();
@@ -1801,10 +1873,14 @@ window.openMode = (m) => {
 let peer = null,
   conn = null,
   p2pRoom = null,
-  p2pReady = false;
+  p2pReady = false,
+  oppProfile = null;
 function openP2PMode() {
+  const pf = S.profile || {};
   openModal(
-    `<h3>🌐 联机对战</h3><div class="sub">基于 PeerJS 的实时 P2P 对战，需要双方网络畅通</div><div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;justify-content:center"><button class="btn y" onclick="p2pCreateRoom()">🏠 创建房间</button><button class="btn c" onclick="p2pShowJoin()">🔗 加入房间</button></div><div id="p2pStatus" style="text-align:center;font-size:.85rem;color:var(--sub);padding:8px;border:1px dashed var(--line);border-radius:10px;display:none;">加载中...</div><div id="p2pRoomDisplay" style="text-align:center;display:none;margin:8px 0;"></div><div id="p2pJoinArea" style="display:none;text-align:center;"><input class="p2p-input" id="p2pJoinInput" placeholder="输入房间码" style="width:100%;max-width:280px;"><div style="margin-top:8px;"><button class="btn solid sm" onclick="p2pJoinRoom()">加入</button></div></div><div class="mbtns"><button class="btn" style="border-color:#999;color:#666" onclick="closeModal()">取消</button></div>`
+    `<h3>🌐 联机对战</h3><div class="sub">基于 PeerJS 的实时 P2P 对战，需要双方网络畅通</div><div class="pf-summary"><span>${pf.avatar || "🧑"} ${
+      pf.name ? escHtml(pf.name) : "<i style='opacity:.65'>未设置昵称</i>"
+    }</span><button class="btn b sm" onclick="openProfileFromP2P()">✏️ 设置资料</button></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;justify-content:center"><button class="btn y" onclick="p2pCreateRoom()">🏠 创建房间</button><button class="btn c" onclick="p2pShowJoin()">🔗 加入房间</button></div><div id="p2pStatus" style="text-align:center;font-size:.85rem;color:var(--sub);padding:8px;border:1px dashed var(--line);border-radius:10px;display:none;">加载中...</div><div id="p2pRoomDisplay" style="text-align:center;display:none;margin:8px 0;"></div><div id="p2pJoinArea" style="display:none;text-align:center;"><input class="p2p-input" id="p2pJoinInput" placeholder="输入房间码" style="width:100%;max-width:280px;"><div style="margin-top:8px;"><button class="btn solid sm" onclick="p2pJoinRoom()">加入</button></div></div><div class="mbtns"><button class="btn" style="border-color:#999;color:#666" onclick="closeModal()">取消</button></div>`
   );
 }
 function p2pShowJoin() {
@@ -1861,6 +1937,7 @@ function setupP2PConnection() {
       '<span class="p2p-status connected"><span class="dot"></span>已连接！</span>';
     toast("✅ 已连接！", "准备开始对战");
     p2pReady = true;
+    sendP2P({ type: "profile", profile: S.profile || {} });
     closeModal();
     setTimeout(() => startP2PBattle(), 300);
   });
@@ -1919,8 +1996,9 @@ function startP2PBattle() {
       `<span class="pill">单词 <b id="bIdx">1/${q.length}</b></span>`,
       right
     ) +
-    `<div class="stage"><div class="lanes"><div class="lane"><div class="nm"><span>🧑 你</span><span id="meP">0%</span></div><div class="track"><div class="fill me" id="meFill"></div><span class="racer" id="meR">🚀</span></div></div><div class="lane"><div class="nm"><span>👤 对手</span><span id="foeP">0%</span></div><div class="track"><div class="fill foe" id="foeFill"></div><span class="racer" id="foeR">🤖</span></div></div></div><div id="cardBox"></div><div class="wordbox" id="wordBox"></div><div class="run-hint">拼完全部 ${q.length} 个单词 · 先完成者获胜！</div></div>`;
+    `<div class="stage"><div class="lanes"><div class="lane"><div class="nm"><span id="meNm">🧑 你</span><span id="meP">0%</span></div><div class="moodline" id="meMood"></div><div class="track"><div class="fill me" id="meFill"></div><span class="racer" id="meR">🚀</span></div></div><div class="lane"><div class="nm"><span id="foeNm">👤 对手</span><span id="foeP">0%</span></div><div class="moodline" id="foeMood"></div><div class="track"><div class="fill foe" id="foeFill"></div><span class="racer" id="foeR">🤖</span></div></div></div><div id="cardBox"></div><div class="wordbox" id="wordBox"></div><div class="run-hint">拼完全部 ${q.length} 个单词 · 先完成者获胜！</div></div>`;
   refreshItems();
+  p2pRenderNames();
   showP2PWord();
   countdown().then(() => {
     if (G && G.active) G.started = true;
@@ -1996,7 +2074,27 @@ function updateP2PLanes() {
   $("#foeP").textContent = Math.round(fp * 100) + "%";
   $("#oppProg").textContent = Math.round(fp * 100) + "%";
 }
+function p2pRenderNames() {
+  const me = S.profile || {},
+    foe = oppProfile || {};
+  const meEl = $("#meNm"),
+    foeEl = $("#foeNm"),
+    meMoodEl = $("#meMood"),
+    foeMoodEl = $("#foeMood");
+  if (meEl)
+    meEl.innerHTML = (me.avatar || "🧑") + " " + escHtml(me.name || "你");
+  if (foeEl)
+    foeEl.innerHTML = (foe.avatar || "👤") + " " + escHtml(foe.name || "对手");
+  if (meMoodEl)
+    meMoodEl.textContent = ((me.moodEmoji || "") + (me.mood ? " " + me.mood : "")).trim();
+  if (foeMoodEl)
+    foeMoodEl.textContent = ((foe.moodEmoji || "") + (foe.mood ? " " + foe.mood : "")).trim();
+}
 function handleP2PData(data) {
+  if (data.type === "profile") {
+    oppProfile = data.profile || null;
+    if ($("#foeNm")) p2pRenderNames();
+  }
   if (data.type === "progress") {
     p2pData.oppProgress = data.prog;
     p2pData.oppErrors = data.errors || 0;
@@ -2059,6 +2157,7 @@ function endP2PBattle(win) {
   if (conn) {
     conn.close();
   }
+  oppProfile = null;
   p2pReady = false;
   p2pData = {
     myProgress: 0,
