@@ -1886,7 +1886,9 @@ let peer = null,
   roomMax = 16,
   p2pState = "lobby", // lobby | playing
   roomScores = {}, // 乱斗累计积分：peerId -> 得分（房主权威，随消息同步）
-  roomWinner = null; // 本轮第一个完成者 peerId（null = 本轮未定）
+  roomResults = {}, // 本轮完成记录：peerId -> { time(秒), errors }（房主收集）
+  roomEnded = false; // 本轮是否已结束（防重复结算）
+const ROOM_SEC = 60; // 乱斗每轮限时（秒）
 function openP2PMode() {
   const pf = S.profile || {};
   openModal(
@@ -2047,13 +2049,16 @@ function startP2PBattle() {
     active: true,
     started: false,
     t0: 0,
+    done: false,
+    finishTime: 0,
+    timeLeft: ROOM_SEC,
   };
   S.stats.games++;
   save();
   go("scr-game");
   const isRoom = p2pMode === "room";
   const right = isRoom
-    ? `<span class="pill">🔥 <b id="combo">0</b></span><span class="pill">⭐ 积分 <b id="myScore">${roomScores[myPeerId] || 0}</b></span>`
+    ? `<span class="pill">⏱ <b id="timeLeft">${ROOM_SEC}</b>s</span><span class="pill">⭐ 积分 <b id="myScore">${roomScores[myPeerId] || 0}</b></span>`
     : `<span class="pill">🔥 <b id="combo">0</b></span><span class="pill">得分 <b id="score">0</b></span><span class="pill">对手进度 <b id="oppProg">0%</b></span>`;
   const lanesHtml = isRoom
     ? `<div class="lanes" id="p2pLanes"></div>`
@@ -2065,12 +2070,23 @@ function startP2PBattle() {
       `<span class="pill">单词 <b id="bIdx">1/${q.length}</b></span>`,
       right
     ) +
-    `<div class="stage">${lanesHtml}<div id="cardBox"></div><div class="wordbox" id="wordBox"></div><div class="run-hint">拼完全部 ${q.length} 个单词 · ${
-      isRoom ? "抢先完成者立即结束本轮并 +1 分" : "先完成者获胜"
-    }！</div></div>`;
+    `<div class="stage">${lanesHtml}<div id="cardBox"></div><div class="wordbox" id="wordBox"></div><div class="run-hint">${
+      isRoom
+        ? `限时 ${ROOM_SEC} 秒拼完 ${q.length} 个单词 · 按完成用时排名得分`
+        : `拼完全部 ${q.length} 个单词 · 先完成者获胜！`
+    }</div></div>`;
   refreshItems();
-  if (isRoom) roomRenderLanes();
-  else p2pRenderNames();
+  if (isRoom) {
+    roomEnded = false;
+    roomResults = {};
+    for (const m of Object.values(members)) {
+      m.done = false;
+      m.time = 0;
+    }
+    if (G.iv) clearInterval(G.iv);
+    G.iv = setInterval(roomTick, 1000);
+    roomRenderLanes();
+  } else p2pRenderNames();
   showP2PWord();
   countdown().then(() => {
     if (G && G.active) {
@@ -2106,8 +2122,10 @@ function onP2PChar(ch) {
       S.stats.bestCombo = Math.max(S.stats.bestCombo, G.best);
       // ★ 新增分数累计
       G.score += 10 + Math.min(G.combo, 20) * 2;
-      $("#score").textContent = G.score;
-      $("#combo").textContent = G.combo;
+      const scEl = $("#score");
+      if (scEl) scEl.textContent = G.score;
+      const cbEl = $("#combo");
+      if (cbEl) cbEl.textContent = G.combo;
       sOk();
       const r = $("#wordBox").getBoundingClientRect();
       burst(r.left + r.width / 2, r.top + r.height / 2, "var(--c-y)");
@@ -2118,20 +2136,19 @@ function onP2PChar(ch) {
       else updateP2PLanes();
       if (G.idx >= G.queue.length) {
         p2pData.myDone = true;
-        sendP2P({ type: "done", errors: G.errors });
+        G.done = true;
+        G.finishTime = ROOM_SEC - Math.max(0, G.timeLeft); // 本轮已用秒数
+        sendP2P({ type: "done", errors: G.errors, time: G.finishTime });
         if (p2pMode === "room") {
+          if (members[myPeerId]) members[myPeerId].done = true;
           if (isHost) {
-            // 房主完成：直接判定本轮结束
-            if (!roomWinner) {
-              roomWinner = myPeerId;
-              roomScores[myPeerId] = (roomScores[myPeerId] || 0) + 1;
-              roomBroadcast({ type: "round_end", winner: myPeerId, scores: Object.assign({}, roomScores) });
-              roomEndRound(myPeerId);
-            }
+            // 房主完成：记录完成时间并广播，全员完成时提前结束本轮
+            roomResults[myPeerId] = { time: G.finishTime, errors: G.errors };
+            roomBroadcast({ type: "done", from: myPeerId, time: G.finishTime, errors: G.errors });
+            roomRenderLanes();
+            roomCheckAllDone();
           } else {
-            // 成员完成：发 done 给房主，等待房主广播本轮结果
-            G.done = true;
-            toast("🏁 你已完成！等待本轮结果...");
+            toast("🏁 你已完成！用时 " + G.finishTime + "s，等待本轮结束...");
           }
           return;
         }
@@ -2143,7 +2160,8 @@ function onP2PChar(ch) {
   } else {
     G.errors++;
     G.combo = 0;
-    $("#combo").textContent = 0;
+    const cbEl = $("#combo");
+    if (cbEl) cbEl.textContent = 0;
     sBad();
     vib(50);
     paintWord($("#wordBox"), it.en, G.typed, true);
@@ -2314,7 +2332,8 @@ function p2pCleanup() {
   myPeerId = null;
   p2pState = "lobby";
   roomScores = {};
-  roomWinner = null;
+  roomResults = {};
+  roomEnded = false;
   roomSettled = false;
 }
 function p2pLeave() {
@@ -2481,18 +2500,15 @@ function roomBindConn(c) {
       roomRenderLanes();
     } else if (d.type === "done") {
       const pid = c.peer;
-      if (members[pid]) members[pid].done = true;
-      if (!roomWinner) {
-        // 第一个完成者：本轮立即结束，其积分 +1，其他人 0
-        roomWinner = pid;
-        roomScores[pid] = (roomScores[pid] || 0) + 1;
-        roomBroadcast({ type: "round_end", winner: pid, scores: Object.assign({}, roomScores) });
-        roomEndRound(pid);
-      } else {
-        // 本轮已结束，仅同步完成状态
-        roomBroadcast({ type: "done", from: pid, errors: d.errors || 0 });
-        roomRenderLanes();
+      if (members[pid]) {
+        members[pid].done = true;
+        members[pid].errors = d.errors || 0;
+        members[pid].time = d.time || 0;
       }
+      if (!roomResults[pid]) roomResults[pid] = { time: d.time || 999, errors: d.errors || 0 };
+      roomBroadcast({ type: "done", from: pid, time: d.time || 0, errors: d.errors || 0 });
+      roomRenderLanes();
+      if (p2pState === "playing" && !roomEnded) roomCheckAllDone();
     }
   });
   c.on("close", () => {
@@ -2519,14 +2535,13 @@ function roomHandleData(d) {
     p2pLeave();
   } else if (d.type === "start") {
     p2pState = "playing";
-    roomWinner = null;
     startP2PBattle();
   } else if (d.type === "disband") {
     toast("🚪 房主已解散房间");
     p2pLeave();
   } else if (d.type === "round_end") {
     roomScores = d.scores || roomScores;
-    roomEndRound(d.winner);
+    roomEndRound(d.results || {});
   } else if (d.type === "progress") {
     if (members[d.from]) members[d.from].prog = d.prog || 0;
     roomRenderLanes();
@@ -2534,6 +2549,7 @@ function roomHandleData(d) {
     if (members[d.from]) {
       members[d.from].done = true;
       members[d.from].errors = d.errors || 0;
+      members[d.from].time = d.time || 0;
     }
     roomRenderLanes();
   }
@@ -2558,38 +2574,95 @@ function roomBroadcastMembers() {
 function roomStartGame() {
   if (!isHost) return;
   p2pState = "playing";
-  roomWinner = null;
-  for (const m of Object.values(members)) m.done = false;
   roomBroadcast({ type: "start" });
   startP2PBattle();
 }
-/* 本轮结束（抢答制）：第一个完成者积分 +1，其余 0；只做分数加减，奖励最后统一结算 */
-function roomEndRound(winnerId) {
+/* 每轮倒计时（房主与成员各自计时；到 0 由房主广播本轮结束） */
+function roomTick() {
+  if (!G || !G.active || G.type !== "p2p") return;
+  G.timeLeft = Math.max(0, G.timeLeft - 1);
+  const tl = $("#timeLeft");
+  if (tl) tl.textContent = G.timeLeft;
+  if (G.timeLeft <= 0 && isHost && !roomEnded) roomFinishRound();
+}
+/* 房主：全员完成 → 提前结束本轮 */
+function roomCheckAllDone() {
+  if (roomEnded) return;
+  if (Object.values(members).every((m) => m.done)) roomFinishRound();
+}
+/* 房主：结束本轮 → 按完成时间排名计分并广播 */
+function roomFinishRound() {
+  if (roomEnded) return;
+  roomEnded = true;
+  if (G && G.iv) clearInterval(G.iv);
+  const scores = roomRankScores();
+  for (const [pid, sc] of Object.entries(scores)) {
+    roomScores[pid] = (roomScores[pid] || 0) + sc;
+  }
+  roomBroadcast({
+    type: "round_end",
+    results: Object.assign({}, roomResults),
+    scores: Object.assign({}, roomScores),
+  });
+  roomEndRound(Object.assign({}, roomResults));
+}
+/* 按完成时间快慢排名计分：第 1 名 = 房间人数分，依次 -1，最后一名完成者 1 分；未完成 0 分 */
+function roomRankScores() {
+  const N = Object.keys(members).length;
+  const finishers = Object.entries(roomResults)
+    .filter(([, r]) => r && typeof r.time === "number")
+    .sort((a, b) => a[1].time - b[1].time);
+  const out = {};
+  finishers.forEach(([pid], i) => {
+    out[pid] = Math.max(1, N - i);
+  });
+  return out;
+}
+/* 本轮结束（限时排名制）：按完成用时排序结算积分 */
+function roomEndRound(results) {
   if (!G || G.type !== "p2p" || !G.active) return;
-  const isWinner = winnerId === myPeerId;
   endGameCleanup();
-  const winnerM = members[winnerId] || {};
-  const winnerNm = (winnerM.profile && winnerM.profile.name) || "对手";
-  const winnerAv = (winnerM.profile && winnerM.profile.avatar) || "👤";
-  const scoreRows = Object.values(members)
-    .map((m) => {
-      const nm = (m.profile && m.profile.name) || (m.id === myPeerId ? "你" : "玩家");
-      const av = (m.profile && m.profile.avatar) || "🧑";
-      const sc = roomScores[m.id] || 0;
-      return `<div class="room-mem"><span>${av} ${escHtml(nm)}${
-        m.id === myPeerId ? "（我）" : ""
-      }${m.id === winnerId ? " 🏆" : ""}</span><b>⭐ ${sc}</b></div>`;
-    })
+  if (G && G.iv) clearInterval(G.iv);
+  // 排名：完成者按用时升序，未完成者排最后
+  const N = Object.keys(members).length;
+  const rows = [];
+  const finishers = Object.entries(results)
+    .filter(([, r]) => r && typeof r.time === "number")
+    .sort((a, b) => a[1].time - b[1].time);
+  finishers.forEach(([pid, r], i) => {
+    const m = members[pid] || {};
+    const nm = (m.profile && m.profile.name) || (pid === myPeerId ? "你" : "玩家");
+    const av = (m.profile && m.profile.avatar) || "🧑";
+    rows.push({ pid, nm, av, time: r.time, errors: r.errors || 0, rank: i + 1, sc: Math.max(1, N - i), done: true });
+  });
+  const unDone = Object.values(members).filter((m) => !finishers.some(([pid]) => pid === m.id));
+  unDone.forEach((m) => {
+    rows.push({ pid: m.id, nm: (m.profile && m.profile.name) || "玩家", av: (m.profile && m.profile.avatar) || "👤", time: null, errors: 0, rank: rows.length + 1, sc: 0, done: false });
+  });
+  rows.sort((a, b) => a.rank - b.rank);
+  const myRank = rows.find((r) => r.pid === myPeerId);
+  const mySc = myRank ? myRank.sc : 0;
+  const rankRows = rows
+    .map(
+      (r) =>
+        `<div class="room-mem"><span>${["🥇", "🥈", "🥉"][r.rank - 1] || r.rank + "."} ${r.av} ${escHtml(r.nm)}${
+          r.pid === myPeerId ? "（我）" : ""
+        }</span><b style="color:${r.sc > 0 ? "var(--c-y)" : "var(--sub)"}">${
+          r.done ? r.time.toFixed(1) + "s" : "未完成"
+        } · ${r.sc > 0 ? "+" + r.sc + " 分" : "0 分"}</b></div>`
+    )
     .join("");
+  const stamp =
+    myRank && myRank.rank === 1
+      ? "🏆 本轮第一！"
+      : myRank && myRank.sc > 0
+      ? `🥈 第 ${myRank.rank} 名`
+      : "💔 本轮未完成";
   const btns = isHost
     ? `<button class="btn y" onclick="roomStartGame()">🎮 再来一局</button><button class="btn p" onclick="p2pHostDisband()">🚪 解散房间</button>`
     : `<div class="sub">等待房主开始下一局...</div><button class="btn b" onclick="p2pLeave()">🏠 退出房间</button>`;
   openModal(
-    `<div style="text-align:center"><div class="stamp">${
-      isWinner ? "🏆 本轮第一！" : "💔 本轮惜败"
-    }</div><div class="sub">${
-      isWinner ? "你抢先完成全部单词" : `${winnerAv} ${escHtml(winnerNm)} 抢先完成`
-    }</div><div class="room-list" style="text-align:left">${scoreRows}</div><div class="mbtns">${btns}</div></div>`
+    `<div style="text-align:center"><div class="stamp">${stamp}</div><div class="sub">本轮用时排名 · +${mySc} 分</div><div class="room-list" style="text-align:left">${rankRows}</div><div class="mbtns">${btns}</div></div>`
   );
 }
 /* 最终结算：按本场积分一次兑换金币/经验（每 1 分 = 40 金币 + 80 经验） */
