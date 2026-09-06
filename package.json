@@ -1,0 +1,10 @@
+{
+  "name": "word-rush",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WORD RUSH 单词快打 · 多教材多词库词汇特训（单文件发布）",
+  "scripts": {
+    "dev": "npx serve .",
+    "build": "node build.mjs"
+  }
+}
