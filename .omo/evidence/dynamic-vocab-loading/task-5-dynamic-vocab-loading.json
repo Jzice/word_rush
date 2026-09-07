@@ -1,0 +1,79 @@
+{
+  "task": 5,
+  "title": "End-to-end QA: happy / failure / cache-fallback / TTL flows",
+  "date": "2026-09-08",
+  "commit": "9fd45ff",
+  "build_smoke": {
+    "npm_run_build_exit": 0,
+    "npm_run_build_dev_exit": 0,
+    "dist_has_DYN_SOURCES": true,
+    "dist_has_old_9book_label": false,
+    "src_has_old_9book_label": false,
+    "dist_size_kb": 161.5
+  },
+  "flows": {
+    "f1_happy": {
+      "kzc_tab_present": true,
+      "hero": "36 个单元 · 1764 词条 · 已通 0 单元 · ⭐ 0/108",
+      "hero_1764": true,
+      "btn_start": "▶ 开始 U1 · 1-50",
+      "game_started_after_countdown": true,
+      "typed_word": "amazing",
+      "progress_after_typing": "2/50",
+      "typed_advanced": true,
+      "esc_modal_open": true,
+      "back_home_after_quit": true,
+      "dropdown_has_kzc": true,
+      "dropdown": "全部词书（15册） + 中考词汇"
+    },
+    "f2_failure": {
+      "method": "route-intercept cet4 URL -> 404",
+      "kzc_still_loads": true,
+      "cet4_toast": "⚠️ 词库加载失败：四级词汇（可稍后刷新重试）",
+      "books": 15,
+      "dynamic_cet4_absent": true,
+      "builtins_intact": true,
+      "all_count": 2818
+    },
+    "f3_cache_fallback": {
+      "method": "seed fresh wordrush_dyn_kzc (3-word fixture) + break kzc fetch",
+      "kzc_from_cache": true,
+      "toasts": ["📖 中考词汇（缓存）", "⚠️ 词库加载失败：四级词汇（可稍后刷新重试）"],
+      "cache_toast_shown": true,
+      "no_fetch_made": true,
+      "hero": "1 个单元 · 3 词条 · 已通 0 单元 · ⭐ 0/3",
+      "btn_start": "▶ 开始 U1 · 1-3"
+    },
+    "f4_ttl": {
+      "method": "seed stale wordrush_dyn_kzc (ts older than 24h) + working URL",
+      "fetch_happened": true,
+      "hero_updated_to_1764": true,
+      "btn_start": "▶ 开始 U1 · 1-50"
+    }
+  },
+  "csv_evidence": {
+    "rows": 1765,
+    "expected_1764_plus_header": true
+  },
+  "console": {
+    "page_errors": [],
+    "zero_uncaught": true
+  },
+  "acceptance": {
+    "build_smoke": true,
+    "happy_flow": true,
+    "failure_flow": true,
+    "cache_fallback": true,
+    "ttl_refetch": true,
+    "zero_uncaught": true,
+    "csv_rows": true
+  },
+  "all_pass": true,
+  "notes": [
+    "Test-script bugs fixed during QA (not code bugs): modal visibility checked via 'hide' class (not 'on'); dynamic cet4 id is 'cet4' not built-in 'c4'.",
+    "Failure flow uses Playwright route interception (404) instead of editing DYN_SOURCES — no source mutation needed, repo left clean.",
+    "Cache flow proves cache-first: fresh cache -> zero network requests to dict/.",
+    "TTL flow proves staleness: ts older than 24h -> fetch happens -> book updates to 1764 words.",
+    "Screenshots: t5-home-kzc.png, t5-book-dropdown.png, t5-cache-home.png, t5-ttl-home.png"
+  ]
+}
