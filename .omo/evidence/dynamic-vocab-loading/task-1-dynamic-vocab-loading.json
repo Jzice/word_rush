@@ -1,0 +1,36 @@
+{
+  "task": "task-1-dynamic-vocab-loading",
+  "title": "Extract buildAll() from the inline ALL builder; fix stale book-count literal",
+  "commit": "refactor(main): extract buildAll() and fix stale book-count literal",
+  "baseline": {
+    "ALL.length": 1054,
+    "books": [
+      ["j1", 110], ["j2", 144], ["j3", 112], ["j4", 123], ["j5", 152],
+      ["g1", 54], ["g2", 55], ["g3", 54], ["g4", 52],
+      ["w1", 41], ["n1", 37], ["ket", 48], ["c4", 36], ["c6", 36]
+    ],
+    "dropdown": "全部词书（9册） + 14 book options (stale 9 literal)"
+  },
+  "post_change": {
+    "ALL.length": 1054,
+    "ALL_matches_baseline": true,
+    "books": [
+      ["j1", 110], ["j2", 144], ["j3", 112], ["j4", 123], ["j5", 152],
+      ["g1", 54], ["g2", 55], ["g3", 54], ["g4", 52],
+      ["w1", 41], ["n1", 37], ["ket", 48], ["c4", 36], ["c6", 36]
+    ],
+    "everyHasItems": true,
+    "dropdown_contains_14": true,
+    "dropdown_option_count": 15
+  },
+  "build_dev": {
+    "exit_code": 0,
+    "output": "✅ 开发模式构建完成 → dist/word_rush.html（未压缩，便于调试） 总输出 203.6KB"
+  },
+  "verification": {
+    "method": "Playwright page.evaluate on http://localhost:3000 (npx serve . -l 3000)",
+    "ALL_length_identical_to_baseline": true,
+    "BOOKS_every_items_gt_0": true,
+    "dropdown_shows_14_books": true
+  }
+}

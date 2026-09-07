@@ -574,31 +574,26 @@ const BOOKS = [
 ];
 
 /* ================= 构建全局词库（取消去重，支持多词库重复） ================= */
-const ALL = [];
-BOOKS.forEach((b) => {
-  b.items = [];
-  b.units.forEach((u, ui) => {
-    u.s = u.s || "U" + (ui + 1);
-    const add = (arr, phrase) => {
-      arr.forEach(([en, cn, pos]) => {
-        const it = {
-          en,
-          cn,
-          book: b.id,
-          phrase,
-          pos: phrase ? "e" : pos || "n",
-          ui,
-          un: u.n,
-          us: u.s,
-        };
-        b.items.push(it);
-        ALL.push(it);
-      });
-    };
-    add(P(u.w), false);
-    if (u.p) add(P(u.p), true);
+let ALL = [];
+function buildAll() {
+  ALL = [];
+  BOOKS.forEach((b) => {
+    b.items = [];
+    b.units.forEach((u, ui) => {
+      u.s = u.s || "U" + (ui + 1);
+      const add = (arr, phrase) => {
+        arr.forEach(([en, cn, pos]) => {
+          const it = { en, cn, book: b.id, phrase, pos: phrase ? "e" : pos || "n", ui, un: u.n, us: u.s };
+          b.items.push(it);
+          ALL.push(it);
+        });
+      };
+      add(P(u.w), false);
+      if (u.p) add(P(u.p), true);
+    });
   });
-});
+}
+buildAll();
 const bookOf = (id) => BOOKS.find((b) => b.id === id);
 
 // 短语库（用于关联记忆）
@@ -3944,7 +3939,7 @@ function fmtDue(m) {
 }
 function renderBook() {
   $("#bkBook").innerHTML =
-    `<option value="all">全部词书（9册）</option>` +
+    `<option value="all">全部词书（${BOOKS.length}册）</option>` +
     BOOKS.map((b) => `<option value="${b.id}">${b.name}</option>`).join("");
   renderWb();
   $("#achGrid").innerHTML = ACH.map(
