@@ -35,6 +35,16 @@ npm run build
 
 > 注意：构建产物中的自定义字体（Google Fonts）与联机对战（PeerJS）仍引用外部 CDN，离线环境下这两项不可用。
 
+### 📚 添加自定义词库
+
+在 `src/main.js` 顶部的 `DYN_SOURCES` 数组里加一行即可（代码配置，无设置界面）：
+
+```js
+{ id: "mybook", name: "我的词库", color: "#5b9bd5", url: "dict/mybook.csv" },
+```
+
+`url` 可以是服务器相对路径（如 `dict/mybook.csv`，构建后需与 `dist/word_rush.html` 同目录部署）或任意 http(s) CSV 链接。CSV 格式：`word,phonetic,pos,definition,source`（表头可选），每 50 词自动切一个单元。启动时自动加载并缓存 24 小时；网络失败时先用缓存，缓存也没有就提示一声并跳过该源，其它词书不受影响。
+
 ## 🗂 项目结构
 
 - `index.html` — 页面结构，内置 onclick 调用全局函数

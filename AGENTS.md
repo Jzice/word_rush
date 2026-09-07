@@ -32,6 +32,15 @@ WORD RUSH 单词快打 — vanilla JS single-page vocabulary typing game (multip
 - `@` and `|` are structural delimiters — never appear inside word/phrase text. `P()` (`src/main.js:26`) parses.
 - Parsed into `it` objects `{en, cn, book, phrase, pos, ui, un, us}` appended to `BOOKS[].items` and `ALL` (`src/main.js:577-601`); `ALL` is the flat lookup list used by gameplay.
 
+### 动态词库（DYN_SOURCES）
+
+- Config is a code-only array `DYN_SOURCES` near the top of `src/main.js` (after `BOOKS`): one entry per source `{ id, name, color, url }`. `url` is either an absolute `http(s)` URL (e.g. a Gitee-hosted CSV) or a server-relative path like `dict/x.csv`.
+- CSV schema `word,phonetic,pos,definition,source` (header optional; positional fallback `en,phonetic,pos,cn,source`). Rows missing en/cn are skipped; cells containing `@`/`|` are skipped (structural delimiters). Words are chunked into units of **50** (`s: "U1"…`, `n: "1-50"…`).
+- Loaded at startup by `loadDynamicBooks()` (async, after first `renderHome()`); per-source try/catch isolation — one failing source toasts `词库加载失败` and never blocks the others. `buildAll()` + `renderHome()` re-run after the batch so new books appear in tabs/dropdown/table automatically.
+- Cache: per-source localStorage key `wordrush_dyn_<id>` storing `{ ts, text }`, TTL 24h (`DYN_TTL`). Fresh cache → no network fetch; stale/missing → fetch; fetch failure → stale-cache fallback with toast.
+- **`id` 必须稳定** — renaming a source id orphans its `S.prog`/`S.mastery` progress (same rule as renaming a word in `BOOKS`; no migration path).
+- `file://` 双击打开时 `fetch` 被浏览器禁止 — 动态词库须用 `npm run dev`/`npx serve` 或部署到 http 服务。Built `dist/word_rush.html` 需要把 `dict/` 放在其同目录部署（构建产物不打包 `dict/`）。
+
 ## Conventions
 
 - UI and code comments are Simplified Chinese — match the existing style.
