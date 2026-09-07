@@ -667,6 +667,15 @@ function csvToUnits(text, { chunk = 50 } = {}) {
   return units;
 }
 
+/* ================= 动态词库缓存（按来源 24h TTL） ================= */
+const dynKey = (id) => "wordrush_dyn_" + id;
+function dynCacheGet(id) {
+  try { return JSON.parse(localStorage.getItem(dynKey(id)) || "null"); } catch (e) { return null; }
+}
+function dynCacheSet(id, text) {
+  try { localStorage.setItem(dynKey(id), JSON.stringify({ ts: Date.now(), text })); } catch (e) { console.warn("缓存写入失败(空间不足?)", e); }
+}
+
 /* ================= 构建全局词库（取消去重，支持多词库重复） ================= */
 let ALL = [];
 function buildAll() {

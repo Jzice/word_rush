@@ -1,0 +1,43 @@
+{
+  "task": "task-3-dynamic-vocab-loading",
+  "title": "Add per-source TTL cache for dynamic word lists (dynKey, dynCacheGet, dynCacheSet)",
+  "commit": "feat(main): add per-source TTL cache for dynamic word lists",
+  "baseline": {
+    "ALL.length": 1054,
+    "no_cache_functions": true
+  },
+  "post_change": {
+    "ALL.length": 1054,
+    "ALL_untouched": true,
+    "new_top_level_declarations": [
+      "const dynKey = (id) => \"wordrush_dyn_\" + id",
+      "function dynCacheGet",
+      "function dynCacheSet"
+    ],
+    "no_window_globals_added": true,
+    "no_await_added": true,
+    "quota_safe_try_catch": true
+  },
+  "build_dev": {
+    "exit_code": 0,
+    "output": "✅ 开发模式构建完成 → dist/word_rush.html（未压缩，便于调试） 总输出 207.7KB"
+  },
+  "verification": {
+    "method": "Playwright page.evaluate on http://localhost:3000 (npx serve . -l 3000)",
+    "assertions": {
+      "dynKey_format_wordrush_dyn_test": true,
+      "dynCacheSet_stores_json_with_ts_and_text": true,
+      "dynCacheGet_roundtrip_returns_text": true,
+      "dynCacheGet_corrupt_json_returns_null": true,
+      "dynCacheGet_missing_key_returns_null": true,
+      "dynCache_ttl_timestamp_fresh": true,
+      "ALL_length_regression_1054": true,
+      "pipeline_functions_still_intact": true
+    }
+  },
+  "notes": [
+    "Cache entry shape: { ts: Date.now(), text } under key wordrush_dyn_<id>; TTL constant DYN_TTL = 864e5 (24h) defined in T2, expiry check is left to the consumer (T4+).",
+    "dynCacheGet returns null on missing key, corrupt JSON, or localStorage unavailability (try/catch) — never throws.",
+    "dynCacheSet swallows quota errors with a console.warn (matches existing save() quota-safe pattern at src/main.js:1110-1114)."
+  ]
+}
