@@ -1,0 +1,73 @@
+{
+  "task": "task-4-dynamic-vocab-loading",
+  "plan": ".omo/plans/dynamic-vocab-loading.md",
+  "date": "2026-09-08",
+  "summary": "Implemented loadDynamicBooks() orchestration + startup wiring + UI refresh. kzc loads from local dict/中考英语词汇表.csv (HTTP 200); cet4 Gitee URL fails with CORS (designed failure path, per-source isolation). S.curBook fallback to j1 verified.",
+  "changes": [
+    {
+      "file": "src/main.js",
+      "spot": "line 579 (DYN_SOURCES)",
+      "change": "kzc url switched from dead Gitee URL (404) to server-relative 'dict/中考英语词汇表.csv'"
+    },
+    {
+      "file": "src/main.js",
+      "spot": "after cache layer (after line 677)",
+      "change": "Inserted applyDynamicBook(src) + loadDynamicBooks() — per-source fetch with cache fallback, toast on failure, buildAll() + curBook fallback + renderHome() after all sources settle"
+    },
+    {
+      "file": "src/main.js",
+      "spot": "init tail (lines 4345-4348)",
+      "change": "Appended loadDynamicBooks() after renderHome(); added startup guard 'if (!bookOf(S.curBook)) { S.curBook = \"j1\"; save(); }' before initial renderHome() — required so a stale curBook pointing at a not-yet-loaded/failed dynamic book cannot crash first paint (plan acceptance test step 5)"
+    }
+  ],
+  "build": {
+    "command": "npm run build:dev",
+    "exit_code": 0,
+    "output": "✅ 开发模式构建完成 → dist/word_rush.html（未压缩，便于调试） 总输出 209.3KB"
+  },
+  "playwright": {
+    "server": "http://localhost:3000 (npx serve, reused)",
+    "kzc_csv_http": 200,
+    "results": {
+      "step1_kzc_tab_present": true,
+      "step1_cet4_toast_or_loaded": true,
+      "step1_toasts": ["⚠️ 词库加载失败：四级词汇（可稍后刷新重试）"],
+      "step2_hero_name": "中考词汇",
+      "step2_hero_meta": "36 个单元 · 1764 词条 · 已通 0 单元 · ⭐ 0/108",
+      "step2_btn_start": "▶ 开始 U1 · 1-50",
+      "step3_game_on": true,
+      "step3_word_shown": "age",
+      "step3_progress_after_typing": "2/50",
+      "step3_esc_modal_open": true,
+      "step3_back_home_after_quit": true,
+      "step4_books": 15,
+      "step4_all_length": 2818,
+      "step4_kzc_items": 1764,
+      "step4_cet4_present": false,
+      "step5_curbook_after_reload_with_cet4": "j1",
+      "step6_dropdown_has_kzc": true,
+      "step6_dropdown_label": "全部词书（15册）",
+      "page_errors": [],
+      "console_zero_uncaught": true
+    },
+    "console_errors_expected": [
+      "CORS blocked fetch to https://gitee.com/justice/english-wordlists/raw/master/CET4_edited.csv (designed failure path — caught by try/catch in applyDynamicBook, surfaced as toast)"
+    ],
+    "screenshots": [
+      "t4-home-kzc.png",
+      "t4-book-dropdown.png"
+    ]
+  },
+  "acceptance": {
+    "kzc_tab_in_bkTabs_within_10s": true,
+    "hero_shows_1764_words": true,
+    "btnStart_shows_U1_1-50": true,
+    "level_run_typing_advances": true,
+    "esc_aborts_cleanly": true,
+    "cet4_failure_toast_shown": true,
+    "all_14_builtin_books_present": true,
+    "no_crash_on_failure": true,
+    "curBook_fallback_to_j1": true,
+    "zero_uncaught_errors": true
+  }
+}

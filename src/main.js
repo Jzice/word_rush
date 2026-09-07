@@ -576,7 +576,7 @@ const BOOKS = [
 /* ================= 动态词库配置（URL 或服务器相对路径，如 dict/x.csv） ================= */
 const DYN_TTL = 864e5; // 缓存 24 小时
 const DYN_SOURCES = [
-  { id: "kzc", name: "中考词汇", color: "#5b9bd5", url: "https://raw.giteeusercontent.com/justice/english-wordlists/raw/master/中考英语词汇表.csv" },
+  { id: "kzc", name: "中考词汇", color: "#5b9bd5", url: "dict/中考英语词汇表.csv" },
   { id: "cet4", name: "四级词汇", color: "#ed7d31", url: "https://gitee.com/justice/english-wordlists/raw/master/CET4_edited.csv" },
 ];
 
@@ -674,6 +674,40 @@ function dynCacheGet(id) {
 }
 function dynCacheSet(id, text) {
   try { localStorage.setItem(dynKey(id), JSON.stringify({ ts: Date.now(), text })); } catch (e) { console.warn("缓存写入失败(空间不足?)", e); }
+}
+
+/* ================= 动态词库加载（按源隔离，失败不阻塞其它源） ================= */
+async function applyDynamicBook(src) {
+  let text = null, fromCache = false;
+  const c = dynCacheGet(src.id);
+  if (c && Date.now() - c.ts < DYN_TTL) { text = c.text; fromCache = true; }
+  else {
+    try {
+      const res = await fetch(src.url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      text = await res.text();
+      dynCacheSet(src.id, text);
+    } catch (e) {
+      if (c && c.text) { text = c.text; fromCache = true; toast("⚠️ 词库加载失败：" + src.name + "，已使用缓存"); }
+      else { toast("⚠️ 词库加载失败：" + src.name + "（可稍后刷新重试）"); return; }
+    }
+  }
+  const units = csvToUnits(text);
+  if (!units.length) { toast("⚠️ 词库解析为空：" + src.name); return; }
+  const i = BOOKS.findIndex((b) => b.id === src.id);
+  if (i >= 0) BOOKS.splice(i, 1);
+  BOOKS.push({ id: src.id, stage: "动态词库", name: src.name, color: src.color, units });
+  if (fromCache) toast("📖 " + src.name + "（缓存）");
+}
+async function loadDynamicBooks() {
+  if (!DYN_SOURCES.length) return;
+  await Promise.all(DYN_SOURCES.map((src) => applyDynamicBook(src).catch((e) => {
+    console.error("动态词库加载异常", src.id, e);
+    toast("⚠️ 词库加载失败：" + src.name);
+  })));
+  buildAll();
+  if (!bookOf(S.curBook)) { S.curBook = "j1"; save(); }  // curBook 指向了失败的动态书 → 兜底回第 1 册
+  renderHome();
 }
 
 /* ================= 构建全局词库（取消去重，支持多词库重复） ================= */
@@ -4344,4 +4378,6 @@ window.buyItem = (k, p) => {
 
 buildOsk();
 refreshHead();
+if (!bookOf(S.curBook)) { S.curBook = "j1"; save(); }  // curBook 指向不存在的书（如未加载的动态书）→ 兜底回第 1 册
 renderHome();
+loadDynamicBooks();
