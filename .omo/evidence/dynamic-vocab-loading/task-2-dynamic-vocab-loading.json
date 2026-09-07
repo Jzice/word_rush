@@ -1,0 +1,60 @@
+{
+  "task": "task-2-dynamic-vocab-loading",
+  "title": "Add DYN_SOURCES config + CSV pipeline (parseCsv, cleanHeadword, mapPos, csvToUnits)",
+  "commit": "feat(main): add dynamic CSV word-source pipeline (DYN_SOURCES, parseCsv, csvToUnits)",
+  "baseline": {
+    "ALL.length": 1054,
+    "BOOKS.length": 14,
+    "no_dynamic_functions": true
+  },
+  "post_change": {
+    "ALL.length": 1054,
+    "ALL_untouched": true,
+    "new_top_level_declarations": [
+      "const DYN_TTL = 864e5",
+      "const DYN_SOURCES (kzc, cet4)",
+      "function parseCsv",
+      "function cleanHeadword",
+      "function mapPos",
+      "function csvToUnits"
+    ],
+    "no_window_globals_added": true,
+    "no_await_added": true
+  },
+  "build_dev": {
+    "exit_code": 0,
+    "output": "✅ 开发模式构建完成 → dist/word_rush.html（未压缩，便于调试） 总输出 207.3KB"
+  },
+  "verification": {
+    "method": "Playwright page.evaluate on http://localhost:3000 (npx serve . -l 3000)",
+    "assertions": {
+      "parseCsv_quoted_fields_and_escaped_quotes": true,
+      "parseCsv_bom_strip": true,
+      "parseCsv_empty_input_returns_array": true,
+      "cleanHeadword_strips_trailing_parenthetical": true,
+      "cleanHeadword_passthrough": true,
+      "mapPos_vt_to_v": true,
+      "mapPos_prep_slash_ad_to_p": true,
+      "mapPos_adj_to_a": true,
+      "mapPos_empty_to_n": true,
+      "csvToUnits_header_sniff_first_triple_begin@开始@v": true,
+      "csvToUnits_positional_fallback_first_triple_a@c@n": true,
+      "csvToUnits_50_word_chunking_U1_1-50_U2_51-100_U3_101-120": true,
+      "csvToUnits_empty_input_returns_array": true,
+      "ALL_length_regression_1054": true
+    },
+    "real_csv_sanity": {
+      "source": "dict/中考英语词汇表.csv (local copy of kzc source)",
+      "rows_parsed": 1765,
+      "units_produced": 36,
+      "first_unit": "U1 1-50, first word ability@能力;才能@n",
+      "last_unit": "U36 1751-1764, 14 words",
+      "begin_survives": true
+    }
+  },
+  "notes": [
+    "parseCsv extended with paren-depth tracking: unquoted commas inside parentheses are NOT treated as delimiters (plan acceptance test input 'begin(began,begun),...' is unquoted; the real kzc CSV quotes it). Verified identical output vs standard parser on the real 1765-row CSV (0 diffs).",
+    "Positional fallback mapping is en=0, phonetic=1, cn=2, pos=3, source=4 (acceptance test 'a,b,c' -> 'a@c@n' requires cn at index 2). Plan text line 125 lists [0,1,2,3,4] as (en,phonetic,pos,cn,source) which contradicts the acceptance test; acceptance test wins.",
+    "csvToUnits positional test input has 2 rows ('a,b,c' + 'x,y,z') so u.w contains 2 triples; plan's 'u.w===\"a@c@n\"' is shorthand for the first triple (plan text: 'first triple en=a, cn=c')."
+  ]
+}

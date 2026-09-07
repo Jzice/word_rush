@@ -573,6 +573,100 @@ const BOOKS = [
   },
 ];
 
+/* ================= 动态词库配置（URL 或服务器相对路径，如 dict/x.csv） ================= */
+const DYN_TTL = 864e5; // 缓存 24 小时
+const DYN_SOURCES = [
+  { id: "kzc", name: "中考词汇", color: "#5b9bd5", url: "https://raw.giteeusercontent.com/justice/english-wordlists/raw/master/中考英语词汇表.csv" },
+  { id: "cet4", name: "四级词汇", color: "#ed7d31", url: "https://gitee.com/justice/english-wordlists/raw/master/CET4_edited.csv" },
+];
+
+/* ================= 动态词库 CSV 解析管线 ================= */
+function parseCsv(text) {
+  if (!text) return [];
+  let s = text.replace(/^\uFEFF/, "").replace(/\r\n|\r/g, "\n").replace(/\n+$/, "");
+  const rows = [];
+  let row = [], field = "", i = 0, inQ = false, depth = 0;
+  while (i < s.length) {
+    const ch = s[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { field += '"'; i += 2; }
+        else { inQ = false; i++; }
+      } else { field += ch; i++; }
+    } else if (ch === '"' && field === "") { inQ = true; i++; }
+    else if (ch === "(") { depth++; field += ch; i++; }
+    else if (ch === ")") { if (depth > 0) depth--; field += ch; i++; }
+    else if (ch === "," && depth === 0) { row.push(field); field = ""; i++; }
+    else if (ch === "\n" && depth === 0) { row.push(field); rows.push(row); row = []; field = ""; i++; }
+    else { field += ch; i++; }
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+function cleanHeadword(w) {
+  let s = w.trim();
+  s = s.replace(/\s*\([^()]*\)\s*$/, "");
+  return s.trim() || w.trim();
+}
+function mapPos(p) {
+  const t = String(p || "").trim().toLowerCase().split(/[/&]/)[0].trim();
+  const M = {
+    n: "n", "n.": "n",
+    a: "a", "a.": "a", adj: "a", "adj.": "a",
+    ad: "d", "ad.": "d", adv: "d", "adv.": "d",
+    v: "v", "v.": "v", vt: "v", "vt.": "v", vi: "v", "vi.": "v", aux: "v", "aux.": "v", modal: "v", "modal.": "v",
+    prep: "p", "prep.": "p",
+    conj: "c", "conj.": "c",
+    pron: "r", "pron.": "r",
+    num: "t", "num.": "t",
+    int: "i", "int.": "i", interj: "i", "interj.": "i",
+    phr: "e", "phr.": "e", phrase: "e",
+  };
+  return M[t] || "n";
+}
+function csvToUnits(text, { chunk = 50 } = {}) {
+  const rows = parseCsv(text);
+  if (!rows.length) return [];
+  let wi = 0, pi = 3, di = 2;
+  if (/^(word|headword|词汇|单词)(\s|$)/i.test(rows[0][0] || "")) {
+    const h = rows.shift();
+    const find = (names) => {
+      for (let i = 0; i < h.length; i++) {
+        const c = (h[i] || "").trim().toLowerCase();
+        if (names.includes(c)) return i;
+      }
+      return -1;
+    };
+    const enI = find(["word", "headword", "词汇", "单词"]);
+    const posI = find(["pos", "词性"]);
+    const cnI = find(["definition", "meaning", "释义", "中文"]);
+    wi = enI >= 0 ? enI : 0;
+    pi = posI >= 0 ? posI : 3;
+    di = cnI >= 0 ? cnI : 2;
+  }
+  const triples = [];
+  let bad = 0;
+  rows.forEach((row) => {
+    const en = cleanHeadword(row[wi] || "");
+    const cn = (row[di] || "").trim();
+    if (!en || !cn) return;
+    if (en.includes("@") || en.includes("|") || cn.includes("@") || cn.includes("|")) { bad++; return; }
+    triples.push([en, cn, mapPos(row[pi])]);
+  });
+  if (bad) console.warn("动态词库：跳过含 @ 或 | 的行", bad, "行");
+  if (!triples.length) return [];
+  const units = [];
+  for (let k = 0; k < triples.length; k += chunk) {
+    const part = triples.slice(k, k + chunk);
+    units.push({
+      s: "U" + (k / chunk + 1),
+      n: (k + 1) + "-" + Math.min(k + chunk, triples.length),
+      w: part.map((t) => t.join("@")).join("|"),
+    });
+  }
+  return units;
+}
+
 /* ================= 构建全局词库（取消去重，支持多词库重复） ================= */
 let ALL = [];
 function buildAll() {
