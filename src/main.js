@@ -19,7 +19,7 @@ const vib = (ms) => {
   try {
     navigator.vibrate && navigator.vibrate(ms);
   } catch (e) {}
-};
+}
 const wFont = (n) =>
   n > 9 ? "clamp(1.2rem,4.6vw,2.2rem)" : "clamp(1.8rem,6vw,3.3rem)";
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
@@ -523,61 +523,17 @@ const BOOKS = [
       },
     ],
   },
-  // ---------- 四级高频词 ----------
-  {
-    id: "c4",
-    stage: "大学",
-    name: "四级高频词",
-    color: "#6a1b9a",
-    units: [
-      {
-        s: "C4-1",
-        n: "核心动词",
-        w: "abandon@放弃@v|absorb@吸收@v|accelerate@加速@v|accomplish@完成@v|accumulate@积累@v|achieve@实现@v|acknowledge@承认@v|adapt@适应@v|adjust@调整@v|admire@钦佩@v|admit@承认@v|adopt@采纳@v",
-      },
-      {
-        s: "C4-2",
-        n: "核心名词",
-        w: "ability@能力@n|access@通道@n|account@账户@n|achievement@成就@n|activity@活动@n|adventure@冒险@n|advice@建议@n|agreement@协议@n|analysis@分析@n|application@申请@n|approach@方法@n|area@区域@n",
-      },
-      {
-        s: "C4-3",
-        n: "核心形容词",
-        w: "abundant@丰富的@a|accurate@精确的@a|active@积极的@a|actual@实际的@a|adequate@足够的@a|advanced@先进的@a|appropriate@恰当的@a|average@平均的@a|aware@意识到的@a|basic@基本的@a|brief@简短的@a|broad@广阔的@a",
-      },
-    ],
-  },
-  // ---------- 六级高频词 ----------
-  {
-    id: "c6",
-    stage: "大学",
-    name: "六级高频词",
-    color: "#c2185b",
-    units: [
-      {
-        s: "C6-1",
-        n: "高级动词",
-        w: "abolish@废除@v|abrupt@突然的@a|abstract@抽象@a|academic@学术的@a|accelerate@加速@v|accommodate@容纳@v|accompany@陪伴@v|accomplish@完成@v|accumulate@积累@v|acquire@获得@v|adapt@适应@v|adhere@坚持@v",
-      },
-      {
-        s: "C6-2",
-        n: "高级名词",
-        w: "abundance@丰富@n|academy@学院@n|access@入口@n|accommodation@住宿@n|accompaniment@伴随物@n|accountability@责任@n|accumulation@积累@n|acquisition@获得@n|adaptation@适应@n|administration@管理@n|advocate@提倡者@n|agenda@议程@n",
-      },
-      {
-        s: "C6-3",
-        n: "高级形容词",
-        w: "aggressive@好斗的@a|ambiguous@模棱两可的@a|ambitious@有雄心的@a|authentic@真实的@a|autonomous@自治的@a|available@可获得的@a|beneficial@有益的@a|cautious@谨慎的@a|competitive@竞争的@a|comprehensive@全面的@a|conscious@有意识的@a|contemporary@当代的@a",
-      },
-    ],
-  },
 ];
 
 /* ================= 动态词库配置（URL 或服务器相对路径，如 dict/x.csv） ================= */
 const DYN_TTL = 864e5; // 缓存 24 小时
 const DYN_SOURCES = [
-  { id: "kzc", name: "中考词汇", color: "#5b9bd5", url: "dict/中考英语词汇表.csv" },
-  { id: "cet4", name: "四级词汇", color: "#ed7d31", url: "https://gitee.com/justice/english-wordlists/raw/master/CET4_edited.csv" },
+  { id: "kzc", name: "中考词汇", color: "#5b9bd5", url: "/vocab/中考英语词汇表.csv" },
+  { id: "cet4", name: "四级词汇", color: "#ed7d31", url: "/vocab/CET4_edited.csv" },
+  { id: "cet6", name: "六级词汇", color: "#b8c4bd", url: "/vocab/CET6_edited.csv" },
+  { id: "gre", name: "GRE词汇", color: "#c2185b", url: "/vocab/GRE_abridged.csv" },
+  { id: "toefl", name: "TOEFL词汇", color: "#6a1b9a", url: "/vocab/TOEFL_abridged.csv" },
+  { id: "z48", name: "专业四八词汇", color: "#ed7d31", url: "/vocab/英语专业四八级词汇表.csv" },
 ];
 
 /* ================= 动态词库 CSV 解析管线 ================= */
