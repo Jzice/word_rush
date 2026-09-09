@@ -54,6 +54,8 @@
               </div>
               <div
                 id="todayStats"
+                onclick="go('scr-stats')"
+                title="点击查看详细学习数据与学习曲线"
                 style="
                   font-size: 0.8rem;
                   color: var(--sub);
@@ -64,6 +66,7 @@
                   display: flex;
                   flex-wrap: wrap;
                   gap: 12px;
+                  cursor: pointer;
                 "
               ></div>
               <div class="lvmap" id="lvMap"></div>
@@ -234,6 +237,17 @@
               </button>
               <button
                 class="mode"
+                style="--mc: var(--c-y)"
+                onclick="go('scr-stats')"
+              >
+                <span class="ic">📊</span
+                ><span
+                  ><h3>学习数据</h3>
+                  <p>学习曲线 · 掌握情况 · 对战战绩</p></span
+                >
+              </button>
+              <button
+                class="mode"
                 style="--mc: var(--c-p)"
                 onclick="go('scr-shop')"
               >
@@ -305,6 +319,12 @@
         <div class="thgrid" id="thGrid"></div>
         <h2 class="sec">🎒 战斗道具</h2>
         <div id="itList"></div>
+      </section>
+
+      <section id="scr-stats" class="scr">
+        <button class="back" onclick="go('scr-home')">← 返回主页</button>
+        <h2 class="sec">📊 学习数据 · 我的成长曲线</h2>
+        <div id="statsBody"></div>
       </section>
     </main>
 

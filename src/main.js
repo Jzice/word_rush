@@ -1234,6 +1234,10 @@ function def() {
       wins: 0,
       memPerfect: 0,
       unitsCleared: 0,
+      p2pWins: 0,
+      p2pLosses: 0,
+      roomRounds: 0,
+      roomWins: 0,
     },
     set: { sound: true, tts: true, osk: "auto", wordOrder: "random" },
     profile: {
@@ -1328,17 +1332,108 @@ const titleOf = (l) => {
   return t;
 };
 
-/* ================= 每日统计 ================= */
-function updateDailyStats(correct, errors, score) {
-  const date = new Date().toISOString().slice(0, 10);
-  if (!S.daily[date])
-    S.daily[date] = { words: 0, correct: 0, errors: 0, score: 0, games: 0 };
-  S.daily[date].words += correct;
-  S.daily[date].correct += correct;
-  S.daily[date].errors += errors;
-  S.daily[date].score += score;
-  S.daily[date].games += 1;
+/* ================= 每日统计（按日期聚合，含学习/挑战/对战维度） ================= */
+const DAILY_FIELDS = [
+  "words", "correct", "errors", "score", "games",
+  "ch", // 挑战局数（限时/陨石/记忆/竞技场）
+  "mTime", "mFall", "mMem", "mBattle", // 各挑战模式局数
+  "duel", "duelW", "duelL", // 单挑：场次/胜/负
+  "room", "roomWin", // 乱斗：轮次/第一名次数
+];
+const dayKey = (d) => d.toISOString().slice(0, 10);
+/* 取某日记录（自动补齐旧记录缺失字段 = 结构迁移） */
+function dailyRec(key) {
+  if (!S.daily || typeof S.daily !== "object") S.daily = {};
+  if (!S.daily[key]) S.daily[key] = {};
+  const d = S.daily[key];
+  for (const k of DAILY_FIELDS) if (typeof d[k] !== "number") d[k] = 0;
+  return d;
+}
+/* 裁剪过久的历史（保留最近 400 天），避免 localStorage 膨胀 */
+function pruneDaily() {
+  const keys = Object.keys(S.daily).sort();
+  if (keys.length <= 400) return;
+  for (const k of keys.slice(0, keys.length - 400)) delete S.daily[k];
+}
+/* kind: run(闯关/复习/每日精练) | time | fall | memory | battle | duel | room */
+function updateDailyStats(correct, errors, score, kind, win) {
+  const d = dailyRec(dayKey(new Date()));
+  d.words += correct;
+  d.correct += correct;
+  d.errors += errors;
+  d.score += score || 0;
+  d.games += 1;
+  if (kind === "time") d.mTime++;
+  else if (kind === "fall") d.mFall++;
+  else if (kind === "memory") d.mMem++;
+  else if (kind === "battle") d.mBattle++;
+  if (kind === "time" || kind === "fall" || kind === "memory" || kind === "battle") d.ch++;
+  if (kind === "duel") {
+    d.duel++;
+    if (win) d.duelW++;
+    else d.duelL++;
+  }
+  if (kind === "room") {
+    d.room++;
+    if (win) d.roomWin++;
+  }
+  pruneDaily();
   save();
+}
+/* 连续学习天数（今天还没学则从昨天往前数，不中断连胜） */
+function learnStreak() {
+  let streak = 0;
+  const d = new Date();
+  if (!(S.daily[dayKey(d)] && S.daily[dayKey(d)].words > 0)) d.setDate(d.getDate() - 1);
+  while (S.daily[dayKey(d)] && S.daily[dayKey(d)].words > 0) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+/* 取最近 n 天的每日记录（n=0 表示全部），按日期升序，缺省补零 */
+function dailyRange(n) {
+  const out = [];
+  const today = new Date();
+  if (n > 0) {
+    for (let i = n - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const k = dayKey(d);
+      out.push({ date: k, rec: S.daily[k] || null });
+    }
+    return out;
+  }
+  const keys = Object.keys(S.daily).sort();
+  return keys.slice(-150).map((k) => ({ date: k, rec: S.daily[k] }));
+}
+/* 区间汇总 */
+function sumRange(rows) {
+  const s = {};
+  for (const k of DAILY_FIELDS) s[k] = 0;
+  let active = 0;
+  for (const { rec } of rows) {
+    if (!rec) continue;
+    for (const k of DAILY_FIELDS) s[k] += typeof rec[k] === "number" ? rec[k] : 0;
+    if (rec.words > 0) active++;
+  }
+  s.active = active;
+  s.acc = s.correct + s.errors ? Math.round((s.correct / (s.correct + s.errors)) * 100) : 0;
+  return s;
+}
+/* 单词掌握分布：按熟练度 0~5 统计（含未学习词） */
+function masteryDist() {
+  const lv = [0, 0, 0, 0, 0, 0];
+  let learned = 0,
+    touched = 0;
+  for (const m of Object.values(S.mastery)) {
+    const l = Math.max(0, Math.min(5, m.lv | 0));
+    lv[l]++;
+    touched++;
+    if (m.r > 0) learned++;
+  }
+  const mastered = lv[5];
+  return { lv, learned, mastered, touched };
 }
 
 /* ================= 学习信息卡片 ================= */
@@ -1526,6 +1621,7 @@ function go(id) {
   if (id === "scr-book") renderBook();
   if (id === "scr-shop") renderShop();
   if (id === "scr-table") renderTable();
+  if (id === "scr-stats") renderStats();
   refreshOsk();
 }
 function toast(t, sub) {
@@ -2735,7 +2831,7 @@ function endP2PBattle(win) {
   } else {
     S.stats.p2pLosses = (S.stats.p2pLosses || 0) + 1;
   }
-  updateDailyStats(G.correct, G.errors, G.score);
+  updateDailyStats(G.correct, G.errors, G.score, "duel", win);
   checkAch();
   save();
   refreshHead();
@@ -3135,6 +3231,11 @@ function roomEndRound(results) {
   rows.sort((a, b) => a.rank - b.rank);
   const myRank = rows.find((r) => r.pid === myPeerId);
   const mySc = myRank ? myRank.sc : 0;
+  // 记录乱斗一轮到每日统计（第一名计入 roomWin）
+  const roomWin = !!(myRank && myRank.rank === 1);
+  S.stats.roomRounds = (S.stats.roomRounds || 0) + 1;
+  if (roomWin) S.stats.roomWins = (S.stats.roomWins || 0) + 1;
+  updateDailyStats(G.correct || 0, G.errors || 0, 0, "room", roomWin);
   const rankRows = rows
     .map(
       (r) =>
@@ -3258,6 +3359,7 @@ document.addEventListener("keydown", (e) => {
       l: () => go("scr-table"),
       p: () => go("scr-book"),
       s: () => go("scr-shop"),
+      d: () => go("scr-stats"),
     };
     if (map[key]) {
       const v = map[key];
@@ -4282,7 +4384,7 @@ function onBattleChar(ch) {
 function battleEnd(win) {
   endGameCleanup();
   if (G.btype !== "2p" || G.phase === 1) {
-    updateDailyStats(G.correct, G.errors, G.score);
+    updateDailyStats(G.correct, G.errors, G.score, "battle");
   }
   if (G.btype === "2p") {
     const rec = {
@@ -4656,6 +4758,255 @@ window.pickTableBook = (id) => {
   save();
   renderTable();
 };
+
+/* ---------- 学习数据屏幕 ---------- */
+let statsRange = 7;
+const STATS_RANGES = [
+  [7, "近 7 天"],
+  [30, "近 30 天"],
+  [90, "近 90 天"],
+  [0, "全部"],
+];
+function setStatsRange(n) {
+  statsRange = n;
+  renderStats();
+}
+function renderStats() {
+  const today = dailyRec(dayKey(new Date()));
+  const todayAcc =
+    today.correct + today.errors
+      ? Math.round((today.correct / (today.correct + today.errors)) * 100)
+      : 0;
+  const streak = learnStreak();
+  const rows = dailyRange(statsRange);
+  const s = sumRange(rows);
+  const avgWords = s.active ? Math.round(s.words / s.active) : 0;
+  const all = sumRange(dailyRange(0)); // 累计（自有记录以来）
+  const duelTotal = (S.stats.p2pWins || 0) + (S.stats.p2pLosses || 0);
+  const dist = masteryDist();
+  const due = dueWords().length,
+    wrong = wrongWords().length;
+  const totalWords = ALL.filter((w) => !w.phrase).length;
+  const stages = ["陌生", "初识", "熟悉", "掌握", "牢固", "永久"];
+  const stageColors = ["#9aa7b4", "#4fc3f7", "#7c4dff", "#ffb300", "#ff7043", "#2e9b57"];
+  const distTotal = dist.touched || 1;
+  const segHtml = stages
+    .map(
+      (nm, i) =>
+        `<div class="mseg" style="width:${(dist.lv[i] / distTotal) * 100}%;background:${
+          stageColors[i]
+        }" title="${nm} ${dist.lv[i]}"></div>`
+    )
+    .join("");
+  const segLegend = stages
+    .map(
+      (nm, i) =>
+        `<span><i style="background:${stageColors[i]}"></i>${nm} <b>${dist.lv[i]}</b></span>`
+    )
+    .join("");
+  const rangeBtns = STATS_RANGES.map(
+    ([n, label]) =>
+      `<button class="seg${statsRange === n ? " on" : ""}" onclick="setStatsRange(${n})">${label}</button>`
+  ).join("");
+  // 每日明细（取区间内最近 30 条有记录的日子）
+  const detailRows = rows
+    .filter((r) => r.rec && (r.rec.words > 0 || r.rec.games > 0))
+    .slice(-30)
+    .reverse()
+    .map((r) => {
+      const d = r.rec;
+      const acc = d.correct + d.errors ? Math.round((d.correct / (d.correct + d.errors)) * 100) : 0;
+      const md = r.date.slice(5).replace("-", "/");
+      const tags = [];
+      if (d.ch) tags.push(`挑战×${d.ch}`);
+      if (d.duel) tags.push(`单挑${d.duelW}胜${d.duelL}负`);
+      if (d.room) tags.push(`乱斗×${d.room}${d.roomWin ? `🏆${d.roomWin}` : ""}`);
+      return `<div class="drow"><span class="ddate">${md}</span><span class="dwords">📝 ${d.words} 词</span><span class="dacc">🎯 ${acc}%</span><span class="dtags">${
+        tags.join(" · ") || "学习"
+      }</span></div>`;
+    })
+    .join("");
+  $("#statsBody").innerHTML = `
+  <div class="stat-cards">
+    <div class="stat-card"><b style="color:var(--c-y)">${today.words}</b><span>📅 今日单词</span></div>
+    <div class="stat-card"><b style="color:var(--ok)">${todayAcc}%</b><span>🎯 今日正确率</span></div>
+    <div class="stat-card"><b>${today.games}</b><span>🏅 今日局数</span></div>
+    <div class="stat-card"><b style="color:var(--c-p)">${streak}</b><span>🔥 连续学习天数</span></div>
+  </div>
+  <div class="panel chart-card">
+    <div class="chart-head">
+      <h3 class="chart-title">📈 学习曲线</h3>
+      <div class="pf-seg">${rangeBtns}</div>
+    </div>
+    <canvas id="learnChart" height="220"></canvas>
+    <div class="chart-legend"><span><i style="background:var(--ok)"></i>每日单词数（柱）</span><span><i style="background:var(--c-y)"></i>正确率（线）</span></div>
+  </div>
+  <div class="stat-cards">
+    <div class="stat-card"><b>${s.words}</b><span>📝 区间单词总数</span></div>
+    <div class="stat-card"><b>${avgWords}</b><span>📊 活跃日均单词</span></div>
+    <div class="stat-card"><b>${s.active}</b><span>🗓 活跃天数</span></div>
+    <div class="stat-card"><b style="color:var(--c-c)">${s.acc}%</b><span>🎯 区间平均正确率</span></div>
+    <div class="stat-card"><b>${s.ch}</b><span>⚔️ 挑战局数</span></div>
+    <div class="stat-card"><b>${s.duel + s.room}</b><span>🌐 对战场次</span></div>
+  </div>
+  <div class="panel">
+    <h3 class="chart-title">🧠 单词掌握情况</h3>
+    <div class="mbar">${segHtml || '<div class="mseg" style="width:100%;background:#9aa7b4"></div>'}</div>
+    <div class="mlegend">${segLegend}</div>
+    <div class="stat-cards" style="margin-top:12px">
+      <div class="stat-card sm"><b>${dist.learned}</b><span>已学单词</span></div>
+      <div class="stat-card sm"><b style="color:#2e9b57">${dist.mastered}</b><span>已永久掌握</span></div>
+      <div class="stat-card sm"><b style="color:var(--c-p)">${due}</b><span>⏰ 待复习</span></div>
+      <div class="stat-card sm"><b style="color:var(--bad)">${wrong}</b><span>✏️ 错题本</span></div>
+      <div class="stat-card sm"><b>${totalWords}</b><span>📚 词库总词数</span></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3 class="chart-title">🎮 挑战模式数据</h3>
+    <div class="mode-tiles">
+      <div class="mtile"><span class="mic">⏱</span><b>${s.mTime}</b><span>限时冲刺 · 累计 ${all.mTime}</span></div>
+      <div class="mtile"><span class="mic">☄️</span><b>${s.mFall}</b><span>陨石单词 · 累计 ${all.mFall}</span></div>
+      <div class="mtile"><span class="mic">🌸</span><b>${s.mMem}</b><span>花瓣记忆 · 累计 ${all.mMem}</span></div>
+      <div class="mtile"><span class="mic">⚔️</span><b>${s.mBattle}</b><span>竞技场 · 累计 ${all.mBattle}</span></div>
+    </div>
+    <div class="stat-cards" style="margin-top:12px">
+      <div class="stat-card sm"><b>${S.stats.games || 0}</b><span>累计总局数</span></div>
+      <div class="stat-card sm"><b>×${S.stats.bestCombo || 0}</b><span>最高连击</span></div>
+      <div class="stat-card sm"><b>${S.stats.perfect || 0}</b><span>满星通关</span></div>
+      <div class="stat-card sm"><b>${S.stats.unitsCleared || 0}</b><span>已通关单元</span></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3 class="chart-title">🌐 联机对战数据</h3>
+    <div class="mode-tiles">
+      <div class="mtile wide"><span class="mic">⚔️</span><b>${s.duel}</b><span>单挑场次 · ${s.duelW} 胜 ${s.duelL} 负</span><em>累计 ${duelTotal} 场 · ${S.stats.p2pWins || 0} 胜 ${S.stats.p2pLosses || 0} 负 · 胜率 ${
+    duelTotal ? Math.round(((S.stats.p2pWins || 0) / duelTotal) * 100) : 0
+  }%</em></div>
+      <div class="mtile wide"><span class="mic">👥</span><b>${s.room}</b><span>乱斗轮次 · 🥇 ${s.roomWin} 次第一</span><em>累计 ${S.stats.roomRounds || 0} 轮 · ${S.stats.roomWins || 0} 次第一</em></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3 class="chart-title">🗓 每日明细（最近 30 条）</h3>
+    <div class="dlist">${
+      detailRows ||
+      '<div class="sub" style="padding:10px;text-align:center">暂无学习记录，快去练几个词吧～</div>'
+    }</div>
+  </div>`;
+  requestAnimationFrame(() => drawLearnChart(rows));
+}
+/* Canvas 学习曲线：柱状=每日单词数，折线=正确率 */
+function drawLearnChart(rows) {
+  const cv = $("#learnChart");
+  if (!cv) return;
+  const cssW = cv.clientWidth || cv.parentElement.clientWidth || 640;
+  const dpr = window.devicePixelRatio || 1;
+  const H = 220;
+  cv.width = cssW * dpr;
+  cv.height = H * dpr;
+  cv.style.height = H + "px";
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const css = (v) => getComputedStyle(document.body).getPropertyValue(v).trim();
+  const cOk = css("--ok") || "#2e9b57",
+    cY = css("--c-y") || "#f5b301",
+    cSub = css("--sub") || "#8a93a3",
+    cLine = css("--line") || "rgba(255,255,255,.15)";
+  const W = cssW,
+    padL = 38,
+    padR = 38,
+    padT = 16,
+    padB = 26;
+  const plotW = W - padL - padR,
+    plotH = H - padT - padB;
+  ctx.clearRect(0, 0, W, H);
+  const data = rows.map((r) => {
+    const d = r.rec;
+    const words = d ? d.words || 0 : 0;
+    const tot = d ? (d.correct || 0) + (d.errors || 0) : 0;
+    return { date: r.date, words, acc: tot ? (d.correct / tot) * 100 : null };
+  });
+  const totalWords = data.reduce((a, b) => a + b.words, 0);
+  // 空状态
+  if (!totalWords) {
+    ctx.fillStyle = cSub;
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("暂无学习记录，快去练几个词吧～", W / 2, H / 2);
+    return;
+  }
+  const maxW = Math.max(10, ...data.map((d) => d.words));
+  const n = data.length;
+  const step = plotW / n;
+  const barW = Math.max(3, step * 0.55);
+  const yWords = (v) => padT + plotH - (v / maxW) * plotH;
+  const yAcc = (v) => padT + plotH - (v / 100) * plotH;
+  // 网格 + 左轴（单词数）
+  ctx.font = "10px sans-serif";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (plotH / 4) * i;
+    ctx.strokeStyle = cLine;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(W - padR, y);
+    ctx.stroke();
+    ctx.fillStyle = cSub;
+    ctx.textAlign = "right";
+    ctx.fillText(Math.round(maxW - (maxW / 4) * i), padL - 6, y + 3);
+    ctx.textAlign = "left";
+    ctx.fillText([100, 75, 50, 25, 0][i] + "%", W - padR + 6, y + 3);
+  }
+  // 柱子
+  data.forEach((d, i) => {
+    const x = padL + step * i + (step - barW) / 2;
+    const y = yWords(d.words);
+    if (d.words > 0) {
+      const g = ctx.createLinearGradient(0, y, 0, padT + plotH);
+      g.addColorStop(0, cOk);
+      g.addColorStop(1, cOk + "55");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      const r = Math.min(3, barW / 2);
+      ctx.roundRect(x, y, barW, padT + plotH - y, [r, r, 0, 0]);
+      ctx.fill();
+    }
+  });
+  // 正确率折线（跳过无数据日）
+  ctx.strokeStyle = cY;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  let pen = false;
+  data.forEach((d, i) => {
+    if (d.acc === null) {
+      pen = false;
+      return;
+    }
+    const x = padL + step * i + step / 2,
+      y = yAcc(d.acc);
+    if (!pen) {
+      ctx.moveTo(x, y);
+      pen = true;
+    } else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.fillStyle = cY;
+  data.forEach((d, i) => {
+    if (d.acc === null) return;
+    const x = padL + step * i + step / 2,
+      y = yAcc(d.acc);
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  // X 轴日期标签（最多 ~7 个）
+  ctx.fillStyle = cSub;
+  ctx.textAlign = "center";
+  const labelEvery = Math.max(1, Math.ceil(n / 7));
+  data.forEach((d, i) => {
+    if (i % labelEvery !== 0 && i !== n - 1) return;
+    ctx.fillText(d.date.slice(5).replace("-", "/"), padL + step * i + step / 2, H - 8);
+  });
+}
 
 /* ---------- 商店 ---------- */
 const THEMES = [

@@ -698,7 +698,7 @@ h2.sec {
 }
 .mini-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 .hud {
@@ -2290,4 +2290,159 @@ footer {
   .wchip {
     padding: 8px 14px;
   }
+}
+
+/* ================= 学习数据屏幕 ================= */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.stat-card {
+  background: var(--panel);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+}
+.stat-card b {
+  display: block;
+  font-family: "Bungee", sans-serif;
+  font-size: 1.35rem;
+  color: var(--ink);
+}
+.stat-card span {
+  font-size: 0.72rem;
+  color: var(--sub);
+}
+.stat-card.sm b {
+  font-size: 1.05rem;
+}
+.chart-card {
+  margin-bottom: 14px;
+}
+.chart-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.chart-title {
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  margin: 0 0 10px;
+}
+.chart-head .chart-title {
+  margin: 0;
+}
+.chart-head .pf-seg {
+  margin-left: auto;
+  width: min(380px, 100%);
+}
+.chart-card canvas {
+  width: 100%;
+  display: block;
+}
+.chart-legend {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: var(--sub);
+  margin-top: 8px;
+}
+.chart-legend i,
+.mlegend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 5px;
+}
+.mbar {
+  display: flex;
+  height: 22px;
+  border-radius: 99px;
+  overflow: hidden;
+  border: 1.5px solid var(--line);
+  margin: 10px 0 8px;
+}
+.mseg {
+  height: 100%;
+  transition: width 0.3s;
+}
+.mlegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 0.72rem;
+  color: var(--sub);
+}
+.mode-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.mtile {
+  background: rgba(0, 0, 0, 0.16);
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mtile .mic {
+  font-size: 1.2rem;
+}
+.mtile b {
+  font-family: "Bungee", sans-serif;
+  font-size: 1.5rem;
+  color: var(--c-y);
+}
+.mtile span {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.mtile em {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--sub);
+}
+.dlist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.drow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.15);
+  font-size: 0.76rem;
+}
+.drow .ddate {
+  font-weight: 900;
+  min-width: 54px;
+}
+.drow .dwords {
+  color: var(--ok);
+  font-weight: 700;
+}
+.drow .dacc {
+  color: var(--c-y);
+  font-weight: 700;
+  min-width: 66px;
+}
+.drow .dtags {
+  color: var(--sub);
+  margin-left: auto;
+  text-align: right;
 }
