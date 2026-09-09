@@ -1223,6 +1223,12 @@ h2.sec {
   margin-bottom: 5px;
   display: flex;
   justify-content: space-between;
+  gap: 8px;
+}
+.lane .nm .lane-st {
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 0.72rem;
 }
 .track {
   height: 26px;

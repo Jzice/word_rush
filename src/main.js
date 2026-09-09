@@ -1352,7 +1352,8 @@ function phLine(it) {
       b
     )}</em><button class="phspk" data-t="${escA(a)}">🔊</button></div>`;
   }
-  const up = bookOf(it.book).items.filter((x) => x.phrase && x.ui === it.ui);
+  const bk = bookOf(it.book); // 联机分发的词对象可能不带本地词库信息
+  const up = bk ? bk.items.filter((x) => x.phrase && x.ui === it.ui) : [];
   if (up.length) {
     const u = up[0];
     return `<div class="wc-ph">📌 本单元短语：<b>${escHtml(
@@ -1365,14 +1366,16 @@ function phLine(it) {
 }
 function wordCard(it, compact) {
   const posTxt = POS[it.pos] || "词";
+  const bk = bookOf(it.book);
+  const src = bk
+    ? bk.name.split(" · ")[0] + (it.un ? ` · ${it.us} ${it.un}` : "")
+    : "⚔️ 联机对战";
   return `<div class="wordcard ${compact ? "compact" : ""}">
   <div class="wc-cn">${escHtml(it.cn)}<span class="pos pos-${posCls(
     it.pos
   )}">${posTxt}</span></div>
   ${phLine(it)}
-  <div class="wc-src">${bookOf(it.book).name.split(" · ")[0]} · ${it.us} ${
-    it.un
-  }</div></div>`;
+  <div class="wc-src">${src}</div></div>`;
 }
 document.addEventListener("click", (e) => {
   const t = e.target.closest("[data-t]");
@@ -2180,7 +2183,92 @@ let peer = null,
   roomScores = {}, // 乱斗累计积分：peerId -> 得分（房主权威，随消息同步）
   roomResults = {}, // 本轮完成记录：peerId -> { time(秒), errors }（房主收集）
   roomEnded = false; // 本轮是否已结束（防重复结算）
+let p2pSelBook = "mix", // 房主选定的对战词库（"mix" 或词库 id）
+  p2pRoundWords = null, // 本局统一词表（房主生成，随 start 消息分发给所有人）
+  p2pStarting = false; // 房主开局去重（异步加载词库期间防重复点击）
 const ROOM_SEC = 60; // 乱斗每轮限时（秒）
+const P2P_WORD_COUNT = 8; // 每局对战单词数
+
+/* 房主选词库选项（复用 bookOpts 列表，但选中态绑定 p2pSelBook） */
+const p2pBookOpts = () =>
+  `<button class="opt${p2pSelBook === "mix" ? " on" : ""}" data-b="mix" data-kind="builtin">🎲 混合词库</button>` +
+  BOOKS.map(
+    (b) => `<button class="opt${p2pSelBook === b.id ? " on" : ""}" data-b="${b.id}" data-kind="${
+      dynSource(b.id) ? "dyn" : "builtin"
+    }">${b.name}</button>`
+  ).join("") +
+  DYN_SOURCES.filter((s) => !dynLoaded(s.id))
+    .map(
+      (s) =>
+        `<button class="opt${p2pSelBook === s.id ? " on" : ""}" data-b="${s.id}" data-kind="unloaded">${s.name} <small>${s.size}</small></button>`
+    )
+    .join("");
+/* 绑定大厅词库选项点击（乱斗/单挑大厅共用） */
+function p2pBindBookOpts(sel) {
+  $$(sel + " .opt").forEach((o) => {
+    o.onclick = () => {
+      $$(sel + " .opt").forEach((x) => x.classList.remove("on"));
+      o.classList.add("on");
+      p2pSelBook = o.dataset.b;
+    };
+  });
+}
+/* 房主按所选词库生成本局统一词表（未加载的扩展词库先惰性加载；失败回退混合词库） */
+async function p2pBuildWords() {
+  let pool = ALL;
+  if (p2pSelBook !== "mix") {
+    let b = bookOf(p2pSelBook);
+    if (!b) {
+      const src = dynSource(p2pSelBook);
+      if (src) {
+        const ok = await ensureDynLoaded(src);
+        if (!ok) toast("⚠️ 词库加载失败：" + src.name + "，本局改用混合词库");
+        b = bookOf(p2pSelBook);
+      }
+    }
+    if (b) pool = b.items;
+    else p2pSelBook = "mix";
+  }
+  const words = shuffle(pool.filter((w) => !w.phrase && w.en.length <= 10)).slice(0, P2P_WORD_COUNT);
+  if (!words.length) {
+    p2pSelBook = "mix";
+    return shuffle(ALL.filter((w) => !w.phrase && w.en.length <= 10)).slice(0, P2P_WORD_COUNT).map((w) => ({
+      en: w.en,
+      cn: w.cn,
+      pos: w.pos,
+    }));
+  }
+  return words.map((w) => ({ en: w.en, cn: w.cn, pos: w.pos }));
+}
+/* 房主：开始单挑（首次开局/再来一局共用）——生成统一词表并随 start 分发 */
+function p2pHostStartDuel() {
+  if (p2pStarting) return;
+  if (!conn || !conn.open) {
+    toast("⚠️ 对手尚未连接");
+    return;
+  }
+  p2pStarting = true;
+  (async () => {
+    try {
+      const words = await p2pBuildWords();
+      // 等待词库（可能含扩展词库联网加载）期间对手可能已断开
+      if (!conn || !conn.open) {
+        p2pStarting = false;
+        toast("⚠️ 对手已断开，无法开局");
+        return;
+      }
+      p2pRoundWords = words;
+      p2pRematchMe = true;
+      p2pRematchFoe = true;
+      p2pStarting = false;
+      sendP2P({ type: "start", words });
+      startP2PBattle();
+    } catch (e) {
+      p2pStarting = false;
+      toast("⚠️ 开局失败，请重试");
+    }
+  })();
+}
 function openP2PMode() {
   const pf = S.profile || {};
   openModal(
@@ -2259,13 +2347,18 @@ function p2pJoinRoom() {
 function setupP2PConnection() {
   if (!conn) return;
   conn.on("open", () => {
-    $("#p2pStatus").innerHTML =
-      '<span class="p2p-status connected"><span class="dot"></span>已连接！</span>';
+    const st = $("#p2pStatus");
+    if (st)
+      st.innerHTML =
+        '<span class="p2p-status connected"><span class="dot"></span>已连接！</span>';
     toast("✅ 已连接！", "准备开始对战");
     p2pReady = true;
+    p2pSelBook = "mix";
+    p2pRoundWords = null;
     sendP2P({ type: "profile", profile: S.profile || {} });
-    closeModal();
-    setTimeout(() => startP2PBattle(), 300);
+    // 房主进入大厅选词后开局，客人等待房主开始（词表由房主随 start 统一分发）
+    if (isHost) p2pDuelLobby();
+    else p2pDuelWaiting();
   });
   conn.on("data", (data) => {
     handleP2PData(data);
@@ -2284,18 +2377,22 @@ function setupP2PConnection() {
       );
       return;
     }
-    // 对局已结束（房间内）：房主保留房间等待新对手，加入者退出房间
+    // 对局已结束（大厅内）：房主保留房间等待新对手，加入者直接退回主页
     if (isHost && peer) {
       toast("👋 对手已退出，房间等待中");
+      oppProfile = null;
     } else {
       toast("🚪 房间已关闭");
-      p2pRoom = null;
       if (peer) {
-        peer.destroy();
+        try {
+          peer.destroy();
+        } catch (e) {}
         peer = null;
       }
+      p2pCleanup();
+      closeModal();
+      go("scr-home");
     }
-    oppProfile = null;
   });
 }
 function sendP2P(data) {
@@ -2305,6 +2402,38 @@ function sendP2P(data) {
     return;
   }
   if (conn && conn.open) conn.send(data);
+}
+/* 单挑大厅（房主）：选词库 + 开始 */
+function p2pDuelLobby() {
+  const me = S.profile || {};
+  openModal(
+    `<h3>⚔️ 单挑房间</h3><div class="sub">房间码 <span class="room-code" style="font-size:1.05rem;letter-spacing:2px;padding:2px 10px">${p2pRoom}</span> · 把房间码发给对手</div>
+     <div class="room-list" style="text-align:left;margin:10px 0">
+       <div class="room-mem"><span>${me.avatar || "🧑"} ${escHtml(me.name || "你")}（我 · 房主）</span><b style="color:var(--c-y)">房主</b></div>
+       <div class="room-mem"><span id="duelOppNm">⏳ 等待对手加入...</span><b id="duelOppSt"></b></div>
+     </div>
+     <div class="sub" style="margin-bottom:8px">选择词库（双方使用同一组词）：</div><div class="optrow" id="duelBkOpts" style="justify-content:center">${p2pBookOpts()}</div>
+     <div class="mbtns"><button class="btn y" onclick="p2pHostStartDuel()">⚔️ 开始对战</button><button class="btn p" onclick="p2pHostDisband()">🚪 解散房间</button></div>`
+  );
+  p2pBindBookOpts("#duelBkOpts");
+  if (oppProfile) {
+    const el = $("#duelOppNm");
+    if (el) el.textContent = (oppProfile.avatar || "👤") + " " + (oppProfile.name || "玩家");
+    const st = $("#duelOppSt");
+    if (st) st.textContent = "已就绪";
+  }
+}
+/* 单挑大厅（客人）：等待房主选词开局 */
+function p2pDuelWaiting() {
+  const me = S.profile || {};
+  openModal(
+    `<h3>⚔️ 单挑</h3><div class="sub">✅ 已连接，等待房主选择词库并开始对战...</div>
+     <div class="room-list" style="text-align:left;margin:10px 0">
+       <div class="room-mem"><span id="duelOppNm">🏠 房主</span><b>选词中...</b></div>
+       <div class="room-mem"><span>${me.avatar || "🧑"} ${escHtml(me.name || "你")}（我）</span><b style="color:var(--ok)">已就绪</b></div>
+     </div>
+     <div class="mbtns"><button class="btn b" onclick="p2pLeave()">🏠 退出房间</button></div>`
+  );
 }
 let p2pData = {
   myProgress: 0,
@@ -2318,8 +2447,12 @@ let p2pData = {
 function startP2PBattle() {
   endGameCleanup();
   closeModal();
-  const pool = ALL.filter((w) => !w.phrase && w.en.length <= 10);
-  const q = shuffle(pool).slice(0, 8);
+  // 词表由房主统一生成并随 start 消息分发；兜底：未收到时本地随机生成
+  let q = p2pRoundWords;
+  if (!q || !q.length) {
+    q = shuffle(ALL.filter((w) => !w.phrase && w.en.length <= 10)).slice(0, P2P_WORD_COUNT);
+    p2pRoundWords = q;
+  }
   p2pData = {
     myProgress: 0,
     oppProgress: 0,
@@ -2375,6 +2508,9 @@ function startP2PBattle() {
     for (const m of Object.values(members)) {
       m.done = false;
       m.time = 0;
+      m.prog = 0;
+      m.errors = 0;
+      m.correct = 0;
     }
     if (G.iv) clearInterval(G.iv);
     G.iv = setInterval(roomTick, 1000);
@@ -2399,6 +2535,25 @@ function showP2PWord() {
   $("#bIdx").textContent = `${G.idx + 1}/${G.queue.length}`;
 }
 
+/* 实时上报我的进度/正确数/失误数（乱斗房主广播时补 from，并同步自己的 members 记录） */
+function p2pSendProgress() {
+  if (!G) return;
+  p2pData.myProgress = (G.idx / G.queue.length) * 100;
+  p2pData.myErrors = G.errors;
+  if (p2pMode === "room" && members[myPeerId]) {
+    members[myPeerId].prog = p2pData.myProgress;
+    members[myPeerId].errors = G.errors;
+    members[myPeerId].correct = G.correct;
+  }
+  const msg = {
+    type: "progress",
+    prog: p2pData.myProgress,
+    errors: G.errors,
+    correct: G.correct,
+  };
+  if (p2pMode === "room" && isHost) msg.from = myPeerId;
+  sendP2P(msg);
+}
 function onP2PChar(ch) {
   if (!G || !G.started || G.done) return;
   const it = G.queue[G.idx];
@@ -2423,17 +2578,20 @@ function onP2PChar(ch) {
       const r = $("#wordBox").getBoundingClientRect();
       burst(r.left + r.width / 2, r.top + r.height / 2, "var(--c-y)");
       G.idx++;
-      p2pData.myProgress = (G.idx / G.queue.length) * 100;
-      sendP2P({ type: "progress", prog: p2pData.myProgress, errors: G.errors });
+      p2pSendProgress();
       if (p2pMode === "room") roomRenderLanes();
       else updateP2PLanes();
       if (G.idx >= G.queue.length) {
         p2pData.myDone = true;
         G.done = true;
         G.finishTime = ROOM_SEC - Math.max(0, G.timeLeft); // 本轮已用秒数
-        sendP2P({ type: "done", errors: G.errors, time: G.finishTime });
         if (p2pMode === "room") {
-          if (members[myPeerId]) members[myPeerId].done = true;
+          if (members[myPeerId]) {
+            members[myPeerId].done = true;
+            members[myPeerId].time = G.finishTime;
+            members[myPeerId].errors = G.errors;
+            members[myPeerId].correct = G.correct;
+          }
           if (isHost) {
             // 房主完成：记录完成时间并广播，全员完成时提前结束本轮
             roomResults[myPeerId] = { time: G.finishTime, errors: G.errors };
@@ -2441,10 +2599,12 @@ function onP2PChar(ch) {
             roomRenderLanes();
             roomCheckAllDone();
           } else {
+            sendP2P({ type: "done", errors: G.errors, time: G.finishTime });
             toast("🏁 你已完成！用时 " + G.finishTime + "s，等待本轮结束...");
           }
           return;
         }
+        sendP2P({ type: "done", errors: G.errors, time: G.finishTime });
         checkP2PWin();
         return;
       }
@@ -2463,6 +2623,9 @@ function onP2PChar(ch) {
       st.classList.add("shake");
       setTimeout(() => st.classList.remove("shake"), 320);
     }
+    // 失误也实时上报，乱斗车道立即刷新各人 ✅/❌
+    p2pSendProgress();
+    if (p2pMode === "room") roomRenderLanes();
   }
 }
 
@@ -2501,6 +2664,12 @@ function handleP2PData(data) {
   if (data.type === "profile") {
     oppProfile = data.profile || null;
     if ($("#foeNm")) p2pRenderNames();
+    // 大厅等待界面实时显示对手昵称
+    const el = $("#duelOppNm");
+    if (el && oppProfile)
+      el.textContent = (oppProfile.avatar || "👤") + " " + (oppProfile.name || "玩家");
+    const st = $("#duelOppSt");
+    if (st) st.textContent = "已就绪";
   }
   if (data.type === "progress") {
     p2pData.oppProgress = data.prog;
@@ -2518,14 +2687,19 @@ function handleP2PData(data) {
   }
   if (data.type === "rematch") {
     p2pRematchFoe = true;
-    if (p2pRematchMe) p2pStartRematch();
-    else {
+    if (isHost) {
+      // 房主权威：双方都点了再来一局 → 房主生成统一词表开局
+      if (p2pRematchMe) p2pHostStartDuel();
+    } else {
       const b = $("#btnRematch");
-      if (b) b.innerHTML = "✅ 接受再来一局";
+      if (b)
+        b.innerHTML = p2pRematchMe ? "⏳ 已准备，等待房主开局..." : "✅ 接受再来一局";
     }
   }
   if (data.type === "start") {
-    if (p2pRematchMe && p2pRematchFoe) return; // 已通过 p2pStartRematch 开局
+    // 客人收到房主开局：使用房主分发的统一词表
+    if (data.words) p2pRoundWords = data.words;
+    p2pStarting = false;
     p2pRematchMe = true;
     p2pRematchFoe = true;
     startP2PBattle();
@@ -2597,20 +2771,15 @@ function endP2PBattle(win) {
     words: [],
   };
 }
-/* ---------- 房间：再来一局 / 解散 / 退出 ---------- */
+/* ---------- 单挑：再来一局 / 解散 / 退出 ---------- */
 function p2pRequestRematch() {
   if (p2pRematchMe || !conn) return;
   p2pRematchMe = true;
   const b = $("#btnRematch");
   if (b) b.innerHTML = "⏳ 等待对方确认...";
   sendP2P({ type: "rematch" });
-  if (p2pRematchFoe) p2pStartRematch();
-}
-function p2pStartRematch() {
-  p2pRematchMe = true;
-  p2pRematchFoe = true;
-  sendP2P({ type: "start" });
-  startP2PBattle();
+  // 房主：若对方也已准备，立即生成统一词表开局
+  if (isHost && p2pRematchFoe) p2pHostStartDuel();
 }
 function p2pCleanup() {
   isHost = false;
@@ -2628,6 +2797,9 @@ function p2pCleanup() {
   roomResults = {};
   roomEnded = false;
   roomSettled = false;
+  p2pSelBook = "mix";
+  p2pRoundWords = null;
+  p2pStarting = false;
 }
 function p2pLeave() {
   if (G && G.type === "p2p") {
@@ -2693,6 +2865,9 @@ function roomCreate() {
   hostConns = {};
   members = {};
   myPeerId = null;
+  p2pSelBook = "mix";
+  p2pRoundWords = null;
+  p2pStarting = false;
   $("#p2pStatus").style.display = "block";
   $("#p2pStatus").innerHTML = "⏳ 创建房间中...";
   peer.on("open", () => {
@@ -2702,6 +2877,7 @@ function roomCreate() {
       profile: S.profile || {},
       prog: 0,
       errors: 0,
+      correct: 0,
       done: false,
     };
     roomRenderLobby();
@@ -2782,6 +2958,7 @@ function roomBindConn(c) {
         profile: d.profile || {},
         prog: 0,
         errors: 0,
+        correct: 0,
         done: false,
       };
       roomBroadcastMembers();
@@ -2792,8 +2969,15 @@ function roomBindConn(c) {
       if (members[pid]) {
         members[pid].prog = d.prog || 0;
         members[pid].errors = d.errors || 0;
+        members[pid].correct = d.correct || 0;
       }
-      roomBroadcast({ type: "progress", from: pid, prog: d.prog || 0, errors: d.errors || 0 });
+      roomBroadcast({
+        type: "progress",
+        from: pid,
+        prog: d.prog || 0,
+        errors: d.errors || 0,
+        correct: d.correct || 0,
+      });
       roomRenderLanes();
     } else if (d.type === "done") {
       const pid = c.peer;
@@ -2831,6 +3015,9 @@ function roomHandleData(d) {
     toast("❌ 房间已满");
     p2pLeave();
   } else if (d.type === "start") {
+    // 使用房主分发的统一词表
+    if (d.words) p2pRoundWords = d.words;
+    p2pStarting = false;
     p2pState = "playing";
     startP2PBattle();
   } else if (d.type === "disband") {
@@ -2840,7 +3027,11 @@ function roomHandleData(d) {
     roomScores = d.scores || roomScores;
     roomEndRound(d.results || {});
   } else if (d.type === "progress") {
-    if (members[d.from]) members[d.from].prog = d.prog || 0;
+    if (members[d.from]) {
+      members[d.from].prog = d.prog || 0;
+      members[d.from].errors = d.errors || 0;
+      members[d.from].correct = d.correct || 0;
+    }
     roomRenderLanes();
   } else if (d.type === "done") {
     if (members[d.from]) {
@@ -2868,10 +3059,15 @@ function roomBroadcastMembers() {
     scores: Object.assign({}, roomScores),
   });
 }
-function roomStartGame() {
-  if (!isHost) return;
+async function roomStartGame() {
+  if (!isHost || p2pStarting) return;
+  p2pStarting = true;
+  // 房主生成统一词表（未加载的扩展词库先惰性加载），随 start 分发给全体成员
+  const words = await p2pBuildWords();
+  p2pRoundWords = words;
+  p2pStarting = false;
   p2pState = "playing";
-  roomBroadcast({ type: "start" });
+  roomBroadcast({ type: "start", words });
   startP2PBattle();
 }
 /* 每轮倒计时（房主与成员各自计时；到 0 由房主广播本轮结束） */
@@ -2992,11 +3188,11 @@ function roomRenderLobby() {
     })
     .join("");
   const head = isHost
-    ? `<div class="mbtns" style="margin-top:14px"><button class="btn y" onclick="roomStartGame()">🎮 开始对战（${list.length}/${roomMax}）</button><button class="btn p" onclick="p2pHostDisband()">🚪 解散房间</button></div>`
+    ? `<div class="sub" style="margin:12px 0 6px">选择词库（全体成员使用同一组词）：</div><div class="optrow" id="roomBkOpts" style="justify-content:center;margin-bottom:8px">${p2pBookOpts()}</div><div class="mbtns" style="margin-top:8px"><button class="btn y" onclick="roomStartGame()">🎮 开始对战（${list.length}/${roomMax}）</button><button class="btn p" onclick="p2pHostDisband()">🚪 解散房间</button></div>`
     : `<div class="sub">${
         p2pState === "playing"
           ? "🎮 对局进行中，等待下一局开始..."
-          : "⏳ 等待房主开始对战..."
+          : "⏳ 等待房主选词并开始对战..."
       }</div><div class="mbtns" style="margin-top:14px"><button class="btn b" onclick="p2pLeave()">🏠 退出房间</button></div>`;
   openModal(
     `<h3>🏠 房间 <span class="room-code" style="font-size:1.15rem;letter-spacing:2px;padding:2px 12px">${p2pRoom}</span></h3><div class="sub">${
@@ -3005,6 +3201,7 @@ function roomRenderLobby() {
       rows || '<div class="sub" style="padding:8px">等待成员加入...</div>'
     }</div>${head}`
   );
+  if (isHost) p2pBindBookOpts("#roomBkOpts");
 }
 function roomRenderLanes() {
   const wrap = $("#p2pLanes");
@@ -3020,9 +3217,12 @@ function roomRenderLanes() {
       const mood = m.profile
         ? ((m.profile.moodEmoji || "") + (m.profile.mood ? " " + m.profile.mood : "")).trim()
         : "";
+      // 实时正确/错误数：我取本局 G，他人取 members 同步值
+      const correct = isMe ? (G ? G.correct : 0) : m.correct || 0;
+      const errors = isMe ? (G ? G.errors : 0) : m.errors || 0;
       return `<div class="lane"><div class="nm"><span>${av} ${escHtml(nm)}${
         isMe ? "（我）" : ""
-      }${done ? " ✅" : ""} <b style="color:var(--c-y)">⭐${roomScores[m.id] || 0}</b></span><span>${Math.round(
+      }${done ? " ✅" : ""} <b style="color:var(--c-y)">⭐${roomScores[m.id] || 0}</b></span><span class="lane-st"><b style="color:var(--ok)">✅${correct}</b> <b style="color:var(--bad)">❌${errors}</b> · ${Math.round(
         pct
       )}%</span></div><div class="moodline">${escHtml(mood)}</div><div class="track"><div class="fill ${
         isMe ? "me" : "foe"
