@@ -528,12 +528,12 @@ const BOOKS = [
 /* ================= 动态词库配置（URL 或服务器相对路径，如 dict/x.csv） ================= */
 const DYN_TTL = 864e5; // 缓存 24 小时
 const DYN_SOURCES = [
-  { id: "kzc", name: "中考词汇", color: "#5b9bd5", url: "/vocab/中考英语词汇表.csv" },
-  { id: "cet4", name: "四级词汇", color: "#ed7d31", url: "/vocab/CET4_edited.csv" },
-  { id: "cet6", name: "六级词汇", color: "#b8c4bd", url: "/vocab/CET6_edited.csv" },
-  { id: "gre", name: "GRE词汇", color: "#c2185b", url: "/vocab/GRE_abridged.csv" },
-  { id: "toefl", name: "TOEFL词汇", color: "#6a1b9a", url: "/vocab/TOEFL_abridged.csv" },
-  { id: "z48", name: "专业四八词汇", color: "#ed7d31", url: "/vocab/英语专业四八级词汇表.csv" },
+  { id: "kzc", name: "中考", size: "约1800词", color: "#5b9bd5", url: "/vocab/中考英语词汇表.csv" },
+  { id: "cet4", name: "四级", size: "约4500词", color: "#ed7d31", url: "/vocab/CET4_edited.csv" },
+  { id: "cet6", name: "六级", size: "约5500词", color: "#b8c4bd", url: "/vocab/CET6_edited.csv" },
+  { id: "gre", name: "GRE", size: "约8000词", color: "#c2185b", url: "/vocab/GRE_abridged.csv" },
+  { id: "toefl", name: "TOEFL", size: "约4500词", color: "#6a1b9a", url: "/vocab/TOEFL_abridged.csv" },
+  { id: "z48", name: "专业四八", size: "约4000词", color: "#ed7d31", url: "/vocab/英语专业四八级词汇表.csv" },
 ];
 
 /* ================= 动态词库 CSV 解析管线 ================= */
@@ -633,7 +633,10 @@ function dynCacheSet(id, text) {
 }
 
 /* ================= 动态词库加载（按源隔离，失败不阻塞其它源） ================= */
-async function applyDynamicBook(src) {
+// 返回 Promise<boolean>：true = 成功加载（BOOKS 已含该词库），false = 失败。
+// opts.silent = true 时静默加载（后台缓存/惰性加载，不弹 toast，仅失败且无缓存时才提示）。
+async function applyDynamicBook(src, opts = {}) {
+  const silent = !!opts.silent;
   let text = null, fromCache = false;
   const c = dynCacheGet(src.id);
   if (c && Date.now() - c.ts < DYN_TTL) { text = c.text; fromCache = true; }
@@ -644,26 +647,91 @@ async function applyDynamicBook(src) {
       text = await res.text();
       dynCacheSet(src.id, text);
     } catch (e) {
-      if (c && c.text) { text = c.text; fromCache = true; toast("⚠️ 词库加载失败：" + src.name + "，已使用缓存"); }
-      else { toast("⚠️ 词库加载失败：" + src.name + "（可稍后刷新重试）"); return; }
+      if (c && c.text) { text = c.text; fromCache = true; if (!silent) toast("⚠️ 词库加载失败：" + src.name + "，已使用缓存"); }
+      else { if (!silent) toast("⚠️ 词库加载失败：" + src.name + "（可稍后刷新重试）"); return false; }
     }
   }
   const units = csvToUnits(text);
-  if (!units.length) { toast("⚠️ 词库解析为空：" + src.name); return; }
+  if (!units.length) { if (!silent) toast("⚠️ 词库解析为空：" + src.name); return false; }
   const i = BOOKS.findIndex((b) => b.id === src.id);
   if (i >= 0) BOOKS.splice(i, 1);
   BOOKS.push({ id: src.id, stage: "动态词库", name: src.name, color: src.color, units });
-  if (fromCache) toast("📖 " + src.name + "（缓存）");
-}
-async function loadDynamicBooks() {
-  if (!DYN_SOURCES.length) return;
-  await Promise.all(DYN_SOURCES.map((src) => applyDynamicBook(src).catch((e) => {
-    console.error("动态词库加载异常", src.id, e);
-    toast("⚠️ 词库加载失败：" + src.name);
-  })));
   buildAll();
-  if (!bookOf(S.curBook)) { S.curBook = "j1"; save(); }  // curBook 指向了失败的动态书 → 兜底回第 1 册
-  renderHome();
+  if (!silent && fromCache) toast("📖 " + src.name + "（缓存）");
+  if (!silent) toast("📖 " + src.name + " 已加载");
+  return true;
+}
+
+// 找出 BOOKS 中对应 id 是否已加载（供惰性加载时判断）
+const dynSource = (id) => DYN_SOURCES.find((s) => s.id === id);
+const dynLoaded = (id) => !!bookOf(id);
+
+/* ================= 扩展词库 · 每日精练（每日词量滑块 + 顺序/逆序/随机） ================= */
+const DYN_DAILY_MIN = 10,
+  DYN_DAILY_MAX = 100,
+  DYN_DAILY_STEP = 10;
+const DYN_ORDERS = ["seq", "rev", "rand"];
+// 滑块值规范化：夹到 10-100 并按 10 取整
+function dynNormDaily(n) {
+  n = Math.round((+n || 20) / DYN_DAILY_STEP) * DYN_DAILY_STEP;
+  return Math.min(DYN_DAILY_MAX, Math.max(DYN_DAILY_MIN, n));
+}
+// 读取（并补齐）某个扩展词库的每日精练设置
+function dynCfg(id) {
+  if (!S.dyn || typeof S.dyn !== "object") S.dyn = {};
+  const d = S.dyn[id] || (S.dyn[id] = { daily: 20, order: "seq", pos: 0 });
+  d.daily = dynNormDaily(d.daily);
+  if (!DYN_ORDERS.includes(d.order)) d.order = "seq";
+  if (typeof d.pos !== "number" || d.pos < 0) d.pos = 0;
+  return d;
+}
+// 扩展词库学习进度统计（基于掌握度）：total / learned（练过）/ mastered（已牢记）
+function dynProgress(id) {
+  const b = bookOf(id);
+  if (!b) return null;
+  let learned = 0,
+    mastered = 0;
+  for (const it of b.items) {
+    const m = S.mastery[it.en.toLowerCase()];
+    if (m && m.r > 0) {
+      learned++;
+      if (m.lv >= 5) mastered++;
+    }
+  }
+  return { total: b.items.length, learned, mastered };
+}
+// 后台静默懒加载（去重并发；失败后允许重试；加载完若仍选中该词库则刷新动态区）
+const dynLoadPromises = {};
+function ensureDynLoaded(src) {
+  if (bookOf(src.id)) return Promise.resolve(true);
+  if (!dynLoadPromises[src.id]) {
+    dynLoadPromises[src.id] = applyDynamicBook(src, { silent: true }).then(
+      (ok) => {
+        if (!ok) delete dynLoadPromises[src.id];
+        else if (S.curBook === src.id) renderHome();
+        return ok;
+      }
+    );
+  }
+  return dynLoadPromises[src.id];
+}
+// 按设置生成一批练习词：顺序/逆序用持久化指针逐批推进（跨天/多批自动续上），随机每次抽样
+function dynDailyQueue(items, id) {
+  const cfg = dynCfg(id);
+  const n = Math.min(cfg.daily, items.length);
+  if (cfg.order === "rand") return shuffle(items).slice(0, n);
+  const base = cfg.order === "rev" ? items.slice().reverse() : items;
+  const q = [];
+  for (let i = 0; i < n; i++) q.push(base[(cfg.pos + i) % base.length]);
+  const wrapped = cfg.pos + n >= base.length; // 本批越过词库末尾 → 完成一轮
+  cfg.pos = (cfg.pos + n) % base.length;
+  save();
+  if (wrapped)
+    setTimeout(
+      () => toast("🏁 " + (dynSource(id)?.name || "扩展词库") + " 已练完一轮，自动开启新一轮"),
+      500
+    );
+  return q;
 }
 
 /* ================= 构建全局词库（取消去重，支持多词库重复） ================= */
@@ -1176,6 +1244,7 @@ function def() {
       moodEmoji: "😀",
     },
     daily: {},
+    dyn: {}, // 扩展词库每日精练设置：{ [id]: { daily, order, pos } }
   };
 }
 let S;
@@ -1192,6 +1261,7 @@ try {
     S.profile
   );
   if (!S.daily) S.daily = {};
+  if (!S.dyn || typeof S.dyn !== "object") S.dyn = {};
 } catch (e) {
   S = def();
 }
@@ -1678,29 +1748,85 @@ function toggleWordOrder() {
 function renderHome() {
   if (window.speechSynthesis) speechSynthesis.getVoices();
 
-  // 词库标签
-  let tabsHtml = BOOKS.map(
-    (b) =>
-      `<button class="bktab ${b.id === S.curBook ? "on" : ""}" style="--bc:${
-        b.color
-      }" onclick="pickBook('${b.id}')">${b.name.replace(" · ", "")}</button>`
+  // 词库标签：内置词库（闯关）+ 扩展词库（每日精练）同区展示，点击都只切换下方动态区
+  let tabsHtml = BOOKS.filter((b) => !dynSource(b.id))
+    .map(
+      (b) =>
+        `<button class="bktab ${b.id === S.curBook ? "on" : ""}" style="--bc:${
+          b.color
+        }" onclick="pickBook('${b.id}')">${b.name.replace(" · ", "")}</button>`
+    )
+    .join("");
+  // 扩展词库始终显示名称（未加载也可选中），选中后在下方动态区设置词量/次序并懒加载
+  tabsHtml += DYN_SOURCES.map(
+    (s) =>
+      `<button class="bktab dyn ${s.id === S.curBook ? "on" : ""}" style="--bc:${
+        s.color
+      }" title="${s.name} · 扩展词库每日精练" onclick="pickBook('${s.id}')">${s.name}</button>`
   ).join("");
-  // 顺序/随机切换按钮
+  // 顺序/随机切换按钮（仅内置闯关相关）
   tabsHtml += `<button class="bktab order-btn" onclick="toggleWordOrder()" style="--bc:var(--c-c);margin-left:auto;">${
     S.set.wordOrder === "random" ? "🔀 随机" : "➡️ 顺序"
   }</button>`;
   $("#bkTabs").innerHTML = tabsHtml;
 
-  const b = bookOf(S.curBook),
-    pr = S.prog[b.id] || { cleared: 0, stars: {} },
-    lvN = b.units.length;
-  $("#heroName").textContent = b.name;
-  $("#heroTag").textContent = b.stage;
-  $("#heroTag").style.background = b.color;
-  const got = Object.values(pr.stars || {}).reduce((a, c) => a + c, 0);
-  $("#heroMeta").textContent = `${b.units.length} 个单元 · ${
-    b.items.length
-  } 词条 · 已通 ${pr.cleared} 单元 · ⭐ ${got}/${lvN * 3}`;
+  // 当前选中：扩展词库（可能尚未加载）还是内置词库
+  const dynSrc = dynSource(S.curBook);
+  let b = bookOf(S.curBook);
+  if (!dynSrc && !b) {
+    // 兜底：选中项异常时回退到第一个内置词库
+    S.curBook = BOOKS.find((x) => !dynSource(x.id))?.id || BOOKS[0].id;
+    b = bookOf(S.curBook);
+  }
+  if (dynSrc) {
+    // ── 扩展词库·每日精练动态区 ──
+    const cfg = dynCfg(dynSrc.id);
+    $("#heroName").textContent = dynSrc.name;
+    $("#heroTag").textContent = "扩展词库";
+    $("#heroTag").style.background = dynSrc.color;
+    $("#heroMeta").textContent = b
+      ? `${b.items.length} 词条 · 每日精练 ${cfg.daily} 词/天`
+      : `${dynSrc.size || "扩展词库"} · 点击开始自动加载`;
+    $("#lvMap").style.display = "none";
+    $("#btnStart").style.display = "none";
+    $("#dynPanel").style.display = "";
+    $("#btnDynStart").style.display = "";
+    $("#btnDynStart").disabled = false;
+    renderDynPanel(dynSrc.id, b);
+    if (!b) ensureDynLoaded(dynSrc); // 未加载则后台静默拉取，完成后自动刷新
+  } else {
+    // ── 内置词库·闯关动态区（功能不变） ──
+    $("#dynPanel").style.display = "none";
+    $("#btnDynStart").style.display = "none";
+    $("#lvMap").style.display = "";
+    $("#btnStart").style.display = "";
+    const pr = S.prog[b.id] || { cleared: 0, stars: {} },
+      lvN = b.units.length;
+    $("#heroName").textContent = b.name;
+    $("#heroTag").textContent = b.stage;
+    $("#heroTag").style.background = b.color;
+    const got = Object.values(pr.stars || {}).reduce((a, c) => a + c, 0);
+    $("#heroMeta").textContent = `${b.units.length} 个单元 · ${
+      b.items.length
+    } 词条 · 已通 ${pr.cleared} 单元 · ⭐ ${got}/${lvN * 3}`;
+    $("#lvMap").innerHTML = b.units
+      .map((u, i) => {
+        const st = pr.stars?.[i],
+          unlocked = i <= pr.cleared,
+          cur = i === pr.cleared && unlocked;
+        return `<div class="lvchip ${cur ? "cur" : ""} ${
+          unlocked ? "" : "lock"
+        }" title="${u.n}" onclick="clickLv(${i})"><b>${u.s}</b><span class="st">${
+          st ? "★".repeat(st) + "☆".repeat(3 - st) : unlocked ? "GO" : "🔒"
+        }</span></div>`;
+      })
+      .join("");
+    const nxt = Math.min(pr.cleared, lvN - 1);
+    $("#btnStart").textContent =
+      pr.cleared >= lvN
+        ? "🔁 重新挑战全册"
+        : `▶ 开始 ${b.units[nxt].s} · ${b.units[nxt].n}`;
+  }
   const today = new Date().toISOString().slice(0, 10);
   const dstat = S.daily[today] || {
     words: 0,
@@ -1720,23 +1846,6 @@ function renderHome() {
    <span>❌ 错误：<b style="color:var(--bad)">${dstat.errors}</b></span>
    <span>🎯 正确率：<b style="color:var(--c-c)">${acc}%</b></span>
    <span>🏅 局数：<b>${dstat.games}</b></span>`;
-  $("#lvMap").innerHTML = b.units
-    .map((u, i) => {
-      const st = pr.stars?.[i],
-        unlocked = i <= pr.cleared,
-        cur = i === pr.cleared && unlocked;
-      return `<div class="lvchip ${cur ? "cur" : ""} ${
-        unlocked ? "" : "lock"
-      }" title="${u.n}" onclick="clickLv(${i})"><b>${u.s}</b><span class="st">${
-        st ? "★".repeat(st) + "☆".repeat(3 - st) : unlocked ? "GO" : "🔒"
-      }</span></div>`;
-    })
-    .join("");
-  const nxt = Math.min(pr.cleared, lvN - 1);
-  $("#btnStart").textContent =
-    pr.cleared >= lvN
-      ? "🔁 重新挑战全册"
-      : `▶ 开始 ${b.units[nxt].s} · ${b.units[nxt].n}`;
   const due = dueWords().length,
     wr = wrongWords().length;
   $("#dueN").textContent = due;
@@ -1752,7 +1861,40 @@ window.pickBook = (id) => {
   S.curBook = id;
   save();
   renderHome();
+  // 选中扩展词库：后台静默懒加载，完成后自动刷新进度（不阻塞页面）
+  const src = dynSource(id);
+  if (src) ensureDynLoaded(src);
 };
+// 渲染扩展词库·每日精练动态区：进度条/文本 + 滑块值 + 次序分段
+function renderDynPanel(id, b) {
+  const cfg = dynCfg(id);
+  $("#dynDaily").value = cfg.daily;
+  $("#dynDailyVal").textContent = cfg.daily;
+  $("#btnDynStart").textContent = `▶ 开始今日练习（${cfg.daily} 词）`;
+  $$("#dynOrderSeg .seg").forEach((x) =>
+    x.classList.toggle("on", x.dataset.v === cfg.order)
+  );
+  const fill = $("#dynProgFill"),
+    txt = $("#dynProgTxt");
+  const p = dynProgress(id);
+  if (!p || !b) {
+    fill.style.width = "0%";
+    txt.textContent =
+      "⏳ 词库尚未加载：点「开始今日练习」自动加载（首次需联网，之后走本地缓存）";
+    return;
+  }
+  let pct, line;
+  if (cfg.order === "rand") {
+    pct = p.total ? Math.round((p.learned / p.total) * 100) : 0;
+    line = `🔀 随机模式 · 已学 ${p.learned}/${p.total} 词（${pct}%）· 已掌握 ${p.mastered} 词 · 每批随机抽 ${cfg.daily} 词`;
+  } else {
+    const pos = Math.min(cfg.pos, p.total);
+    pct = p.total ? Math.round((pos / p.total) * 100) : 0;
+    line = `${cfg.order === "rev" ? "⬅️ 逆序" : "➡️ 顺序"}闯关 · 本轮进度 ${pos}/${p.total}（${pct}%）· 已学 ${p.learned} 词 · 已掌握 ${p.mastered} 词`;
+  }
+  fill.style.width = pct + "%";
+  txt.textContent = line;
+}
 window.clickLv = (i) => {
   const b = bookOf(S.curBook),
     pr = S.prog[b.id] || { cleared: 0, stars: {} };
@@ -1774,6 +1916,56 @@ $("#btnReview").onclick = () => {
 $("#btnWrong").onclick = () => {
   const q = shuffle(wrongWords()).slice(0, 15);
   if (q.length) startRun({ mode: "review", title: "错题重练", queue: q });
+};
+// ── 扩展词库·每日精练控件（元素常驻，绑定一次即可） ──
+$("#dynDaily").addEventListener("input", () => {
+  const src = dynSource(S.curBook);
+  if (!src) return;
+  const cfg = dynCfg(src.id);
+  cfg.daily = dynNormDaily($("#dynDaily").value);
+  $("#dynDaily").value = cfg.daily;
+  save();
+  $("#dynDailyVal").textContent = cfg.daily;
+  $("#btnDynStart").textContent = `▶ 开始今日练习（${cfg.daily} 词）`;
+});
+$$("#dynOrderSeg .seg").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    const src = dynSource(S.curBook);
+    if (!src) return;
+    const cfg = dynCfg(src.id);
+    cfg.order = btn.dataset.v;
+    save();
+    $$("#dynOrderSeg .seg").forEach((x) =>
+      x.classList.toggle("on", x === btn)
+    );
+    renderDynPanel(src.id, bookOf(src.id));
+  })
+);
+$("#btnDynStart").onclick = async () => {
+  const src = dynSource(S.curBook);
+  if (!src) return;
+  const btn = $("#btnDynStart");
+  if (btn.disabled) return;
+  let b = bookOf(src.id);
+  if (!b) {
+    // 懒加载：进入练习前确保词库就绪
+    btn.disabled = true;
+    btn.textContent = "⏳ 词库加载中…";
+    const ok = await ensureDynLoaded(src);
+    if (!ok) {
+      btn.disabled = false;
+      renderDynPanel(src.id, null);
+      toast("⚠️ 词库加载失败：" + src.name + "，请稍后重试");
+      return;
+    }
+    b = bookOf(src.id);
+  }
+  const q = dynDailyQueue(b.items, src.id);
+  if (!q.length) {
+    toast("⚠️ 词库为空：" + src.name);
+    return;
+  }
+  startRun({ mode: "daily", title: src.name, queue: q, keepOrder: true });
 };
 
 /* ================= 弹窗 ================= */
@@ -1883,9 +2075,12 @@ window.showWrongList = function () {
 /* ================= 模式设置弹窗 ================= */
 let sel = { book: "mix", btype: "bot", diff: "mid" };
 const bookOpts = () =>
-  `<button class="opt on" data-b="mix">🎲 混合词库</button>` +
+  `<button class="opt on" data-b="mix" data-kind="builtin">🎲 混合词库</button>` +
   BOOKS.map(
-    (b) => `<button class="opt" data-b="${b.id}">${b.name}</button>`
+    (b) => `<button class="opt" data-b="${b.id}" data-kind="${dynSource(b.id) ? "dyn" : "builtin"}">${b.name}</button>`
+  ).join("") +
+  DYN_SOURCES.filter((s) => !dynLoaded(s.id)).map(
+    (s) => `<button class="opt" data-b="${s.id}" data-kind="unloaded">${s.name} <small>${s.size}</small></button>`
   ).join("");
 window.openMode = (m) => {
   if (m === "time" || m === "fall" || m === "memory") {
@@ -1945,7 +2140,15 @@ window.openMode = (m) => {
           }
         })
     );
-  $("#goBtn").onclick = () => {
+  $("#goBtn").onclick = async () => {
+    // 若选中了尚未加载的扩展词库 → 惰性加载（静默），成功后才开局
+    if (sel.book !== "mix" && !bookOf(sel.book)) {
+      const src = dynSource(sel.book);
+      if (src) {
+        const ok = await applyDynamicBook(src, { silent: true });
+        if (!ok) { toast("⚠️ 词库加载失败：" + src.name + "，请稍后重试"); return; }
+      }
+    }
     closeModal();
     const pool = sel.book === "mix" ? ALL : bookOf(sel.book).items;
     if (m === "time") startTime(pool);
@@ -1967,6 +2170,7 @@ let peer = null,
   isHost = false,
   p2pRematchMe = false,
   p2pRematchFoe = false,
+  p2pLastRoomCode = "", // 记忆上次加入的房间码
   // ---- 多人房间 ----
   hostConns = {}, // 房主侧：peerId -> { conn }
   members = {}, // 双方：peerId -> { id, profile, prog, errors, done }
@@ -2003,6 +2207,7 @@ function p2pShowJoin() {
   $("#p2pJoinArea").style.display = "block";
 }
 function roomShowJoin() {
+  $("#p2pJoinInput").value = p2pLastRoomCode;
   $("#p2pJoinArea").style.display = "block";
 }
 function p2pCreateRoom() {
@@ -2514,11 +2719,13 @@ function roomJoin() {
     toast("请输入房间码");
     return;
   }
+  p2pLastRoomCode = code;
   if (peer) peer.destroy();
   peer = new Peer({ debug: 2 });
   isHost = false;
   p2pState = "lobby";
   members = {};
+  p2pRoom = code;
   $("#p2pStatus").style.display = "block";
   $("#p2pStatus").innerHTML = "⏳ 连接中...";
   peer.on("open", () => {
@@ -2535,6 +2742,8 @@ function roomSetupConnection() {
   if (!conn) return;
   conn.on("open", () => {
     p2pReady = true;
+    $("#p2pStatus").innerHTML =
+      '<span class="p2p-status connected"><span class="dot"></span>已连接！</span>';
     sendP2P({ type: "join", profile: S.profile || {} });
     toast("✅ 已连接房间");
   });
@@ -2616,7 +2825,7 @@ function roomHandleData(d) {
     (d.members || []).forEach((m) => (members[m.id] = m));
     roomScores = d.scores || roomScores;
     p2pState = d.playing ? "playing" : "lobby";
-    if (wasPlaying || p2pState === "playing") roomRenderLanes();
+    if (isHost && (wasPlaying || p2pState === "playing")) roomRenderLanes();
     else roomRenderLobby();
   } else if (d.type === "full") {
     toast("❌ 房间已满");
@@ -3014,7 +3223,8 @@ window.startTime = (pool) => {
 };
 function startRun(cfg) {
   let queue = [...cfg.queue];
-  if (S.set.wordOrder === "random") queue = shuffle(queue);
+  // keepOrder：扩展词库每日精练已按 顺序/逆序/随机 排好，不再受全局随机开关影响
+  if (!cfg.keepOrder && S.set.wordOrder === "random") queue = shuffle(queue);
   endGameCleanup();
   G = {
     type: "run",
@@ -3062,7 +3272,13 @@ function startRun(cfg) {
   const hd =
     cfg.mode === "level"
       ? `${cfg.title} · ${bookOf(cfg.bookId).name.split(" · ")[0]}`
-      : `${cfg.title} · ${cfg.mode === "time" ? "60 秒" : "记忆计划"}`;
+      : `${cfg.title} · ${
+          cfg.mode === "time"
+            ? "60 秒"
+            : cfg.mode === "daily"
+            ? "每日精练"
+            : "记忆计划"
+        }`;
   const extraHint =
     cfg.mode === "time"
       ? `<div style="font-size:0.7rem;color:var(--sub);text-align:center;margin-top:4px;">拼写正确自动朗读（🔊控制）</div>`
@@ -4336,4 +4552,3 @@ buildOsk();
 refreshHead();
 if (!bookOf(S.curBook)) { S.curBook = "j1"; save(); }  // curBook 指向不存在的书（如未加载的动态书）→ 兜底回第 1 册
 renderHome();
-loadDynamicBooks();

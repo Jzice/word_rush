@@ -67,7 +67,47 @@
                 "
               ></div>
               <div class="lvmap" id="lvMap"></div>
+              <!-- 扩展词库·每日精练动态区（选中扩展词库标签时显示） -->
+              <div class="dyn-panel" id="dynPanel" style="display: none">
+                <div class="dyn-prog">
+                  <div class="dyn-prog-bar"><i id="dynProgFill"></i></div>
+                  <div class="dyn-prog-txt" id="dynProgTxt"></div>
+                </div>
+                <div class="pf-row">
+                  <label
+                    >每日学习个数：<b id="dynDailyVal" style="color: var(--c-y)"
+                      >20</b
+                    >
+                    词/天</label
+                  >
+                  <input
+                    type="range"
+                    class="dyn-slider"
+                    id="dynDaily"
+                    min="10"
+                    max="100"
+                    step="10"
+                    value="20"
+                  />
+                  <div class="dyn-slider-scale">
+                    <span style="left: 0%">10</span
+                    ><span style="left: 44.4%">50</span
+                    ><span style="left: 100%">100</span>
+                  </div>
+                </div>
+                <div class="pf-row">
+                  <label>词汇次序</label>
+                  <div class="pf-seg" id="dynOrderSeg">
+                    <button class="seg" data-v="seq">➡️ 顺序</button>
+                    <button class="seg" data-v="rev">⬅️ 逆序</button>
+                    <button class="seg" data-v="rand">🔀 随机</button>
+                  </div>
+                </div>
+              </div>
               <button class="btn solid" id="btnStart">▶ 开始闯关</button>
+              <button class="btn solid" id="btnDynStart" style="display: none">
+                ▶ 开始今日练习
+              </button>
               <button class="btn b sm" onclick="showShareModal()">
                 📤 分享挑战
               </button>

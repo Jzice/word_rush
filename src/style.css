@@ -337,6 +337,100 @@ h2.sec {
   background: var(--c-c);
   color: #14202c;
 }
+/* 扩展词库标签（与内置词库同区，虚线彩色描边区分） */
+.bktab.dyn {
+  border-style: dashed;
+  border-color: var(--bc, var(--c-p));
+  color: var(--bc, var(--c-p));
+  background: color-mix(in srgb, var(--bc, var(--c-p)) 10%, transparent);
+}
+.bktab.dyn:hover {
+  background: var(--bc, var(--c-p));
+  color: #14202c;
+  border-color: transparent;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+}
+.bktab.dyn.on {
+  border-style: solid;
+  border-color: transparent;
+  background: var(--bc, var(--c-p));
+  color: #14202c;
+  transform: rotate(-2deg) scale(1.06);
+}
+/* 扩展词库·每日精练动态区 */
+.dyn-panel {
+  margin: 18px 0 10px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1.5px dashed var(--line);
+  border-radius: 14px;
+}
+.dyn-prog-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.dyn-prog-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--c-y), var(--c-p));
+  transition: width 0.4s;
+}
+.dyn-prog-txt {
+  font-size: 0.78rem;
+  color: var(--sub);
+  margin: 8px 0 2px;
+  text-align: center;
+}
+.dyn-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--c-y), var(--c-p));
+  outline: none;
+  cursor: pointer;
+  margin: 6px 0 2px;
+}
+.dyn-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid var(--c-y);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+  transition: transform 0.12s;
+}
+.dyn-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+.dyn-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid var(--c-y);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+}
+.dyn-slider-scale {
+  position: relative;
+  height: 14px;
+  font-size: 0.66rem;
+  color: var(--sub);
+}
+.dyn-slider-scale span {
+  position: absolute;
+  transform: translateX(-50%);
+}
 .hero-top {
   display: flex;
   justify-content: space-between;
