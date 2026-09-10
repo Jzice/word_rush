@@ -293,6 +293,39 @@ header {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.user-chip .user-mood-emoji {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+/* 主页心情栏 */
+.user-mood {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+  transition: 0.18s;
+}
+.user-mood:hover {
+  border-color: var(--c-y);
+  background: color-mix(in srgb, var(--c-y) 8%, var(--panel));
+}
+.user-mood .mood-emoji {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.user-mood .mood-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 main {
   position: relative;
   z-index: 1;
