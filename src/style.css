@@ -291,10 +291,6 @@ header {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.user-chip .user-mood-emoji {
-  font-size: 0.95rem;
-  line-height: 1;
-}
 /* 主页心情栏 */
 .user-mood {
   display: flex;

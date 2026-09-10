@@ -1792,17 +1792,15 @@ function refreshHead() {
   $("#btnOsk").classList.toggle("off", (S.set.osk || "auto") === "off");
   $("#btnSound").textContent = S.set.sound ? "🔔" : "🔕";
   $("#btnTts").textContent = S.set.tts ? "🔊" : "🔇";
-  // 顶部用户卡片：头像 + 用户名 + 心情 emoji
+  // 顶部用户卡片：头像 + 用户名
   const pf = S.profile || {};
   const ua = $("#userAvatar");
   const un = $("#userName");
-  const ue = $("#userMoodEmoji");
   if (ua) ua.textContent = pf.avatar || "🧑";
   if (un) {
     const nm = (pf.name || "").trim();
     un.textContent = nm ? (nm.length > 6 ? nm.slice(0, 6) + "…" : nm) : "未命名";
   }
-  if (ue) ue.textContent = pf.moodEmoji || "😀";
   // 主页心情栏（仅主页存在该节点）
   const moodEl = $("#userMood");
   if (moodEl) {
