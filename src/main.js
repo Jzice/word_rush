@@ -2200,15 +2200,12 @@ function renderHome() {
   $("#btnReview").disabled = !due;
   $("#wrongN").textContent = wr;
   $("#btnWrong").disabled = !wr;
-  // ── 今日任务卡：待复习 + 新学目标 + 进度条 + 一键开始 ──
+  // ── 今日任务卡：纯数据展示（待复习 + 新学目标 + 已完成 + 进度条） ──
+  // 复习入口统一走下方「今日复习任务」卡片的「开始复习」按钮，避免重复
   const freshGoal = dynSrc ? dynCfg(dynSrc.id).daily : 20;
   const goal = due + freshGoal;
   const done = dstat.words || 0;
   const pct = goal ? Math.min(100, Math.round((done / goal) * 100)) : 0;
-  // 仅在有待复习词时显示「先复习」按钮；无待复习词时不显示，避免与下方开始按钮重复
-  const taskBtn = due
-    ? `<button class="btn solid task-btn" onclick="document.getElementById('btnReview').click()">🔁 先复习到期词</button>`
-    : "";
   $("#todayTask").innerHTML = goal
     ? `<div class="task-card">
         <div class="task-head">
@@ -2221,7 +2218,6 @@ function renderHome() {
           <div class="task-item"><span class="tk-fresh">🌱 新学目标</span><b>${freshGoal}</b></div>
           <div class="task-item"><span class="tk-done">✅ 已完成</span><b>${done}</b></div>
         </div>
-        ${taskBtn}
       </div>`
     : "";
   refreshHead();
