@@ -306,9 +306,9 @@ h2.sec {
 .bktab {
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--sub);
+  color: var(--stc, var(--sub));
   background: transparent;
-  border: 1.5px dashed var(--line);
+  border: 1.5px dashed var(--stc, var(--line));
   border-radius: 999px;
   padding: 5px 13px;
   cursor: pointer;
@@ -337,26 +337,8 @@ h2.sec {
   background: var(--c-c);
   color: #14202c;
 }
-/* 扩展词库标签（与内置词库同区，虚线彩色描边区分） */
-.bktab.dyn {
-  border-style: dashed;
-  border-color: var(--bc, var(--c-p));
-  color: var(--bc, var(--c-p));
-  background: color-mix(in srgb, var(--bc, var(--c-p)) 10%, transparent);
-}
-.bktab.dyn:hover {
-  background: var(--bc, var(--c-p));
-  color: #14202c;
-  border-color: transparent;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
-}
-.bktab.dyn.on {
-  border-style: solid;
-  border-color: transparent;
-  background: var(--bc, var(--c-p));
-  color: #14202c;
-  transform: rotate(-2deg) scale(1.06);
-}
+/* 扩展词库标签：未选中时与内置词库同风格（灰虚线、透明底），
+   选中时走 .bktab.on 并用内联 --bc 主题色实底；.dyn 仅作语义钩子 */
 /* 扩展词库·每日精练动态区 */
 .dyn-panel {
   margin: 18px 0 10px;

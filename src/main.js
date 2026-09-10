@@ -527,14 +527,38 @@ const BOOKS = [
 
 /* ================= 动态词库配置（URL 或服务器相对路径，如 dict/x.csv） ================= */
 const DYN_TTL = 864e5; // 缓存 24 小时
+// stage：学段标签（小学/初中/高中/大学/考研/留学），显示在主页徽标与词库标签提示中
 const DYN_SOURCES = [
-  { id: "kzc", name: "中考", size: "约1800词", color: "#5b9bd5", url: "/vocab/中考英语词汇表.csv" },
-  { id: "cet4", name: "四级", size: "约4500词", color: "#ed7d31", url: "/vocab/CET4_edited.csv" },
-  { id: "cet6", name: "六级", size: "约5500词", color: "#b8c4bd", url: "/vocab/CET6_edited.csv" },
-  { id: "gre", name: "GRE", size: "约8000词", color: "#c2185b", url: "/vocab/GRE_abridged.csv" },
-  { id: "toefl", name: "TOEFL", size: "约4500词", color: "#6a1b9a", url: "/vocab/TOEFL_abridged.csv" },
-  { id: "z48", name: "专业四八", size: "约4000词", color: "#ed7d31", url: "/vocab/英语专业四八级词汇表.csv" },
+  // ── 初中 ──
+  { id: "rj7", name: "人教七年级", size: "约880词", color: "#4dd0e1", stage: "初中", url: "/vocab/人教初中七年级.csv" },
+  { id: "rj8", name: "人教八年级", size: "约880词", color: "#26c6da", stage: "初中", url: "/vocab/人教初中八年级.csv" },
+  { id: "rj9", name: "人教九年级", size: "约550词", color: "#00acc1", stage: "初中", url: "/vocab/人教初中九年级.csv" },
+  { id: "kzc", name: "中考", size: "约1800词", color: "#5b9bd5", stage: "初中", url: "/vocab/中考英语词汇表.csv" },
+  // ── 高中 ──
+  { id: "rjg", name: "人教高中", size: "约3900词", color: "#7c4dff", stage: "高中", url: "/vocab/人教高中.csv" },
+  // ── 大学 ──
+  { id: "cet4", name: "四级", size: "约4500词", color: "#ed7d31", stage: "大学", url: "/vocab/CET4_edited.csv" },
+  { id: "cet6", name: "六级", size: "约5500词", color: "#b8c4bd", stage: "大学", url: "/vocab/CET6_edited.csv" },
+  { id: "tem4", name: "专四", size: "约4600词", color: "#26a69a", stage: "大学", url: "/vocab/专四.csv" },
+  { id: "tem8", name: "专八", size: "约1.3万词", color: "#00897b", stage: "大学", url: "/vocab/专八.csv" },
+  // ── 考研 ──
+  { id: "ky", name: "考研", size: "约9600词", color: "#d81b60", stage: "考研", url: "/vocab/考研.csv" },
+  // ── 留学 ──
+  { id: "ielts", name: "雅思", size: "约7000词", color: "#1e88e5", stage: "留学", url: "/vocab/雅思.csv" },
+  { id: "toefl", name: "TOEFL", size: "约4500词", color: "#6a1b9a", stage: "留学", url: "/vocab/TOEFL_abridged.csv" },
+  { id: "gre", name: "GRE", size: "约8000词", color: "#c2185b", stage: "留学", url: "/vocab/GRE_abridged.csv" },
 ];
+
+/* 学段配色：未选中词库按钮的虚线/文字按学段着色（选中后仍用词库各自主题色） */
+const STAGE_COLORS = {
+  小学: "#66bb6a",
+  初中: "#29b6f6",
+  高中: "#7c4dff",
+  大学: "#ff9800",
+  考研: "#ec407a",
+  留学: "#5c6bc0",
+};
+const stageColor = (st) => STAGE_COLORS[st] || "";
 
 /* ================= 动态词库 CSV 解析管线 ================= */
 function parseCsv(text) {
@@ -655,7 +679,7 @@ async function applyDynamicBook(src, opts = {}) {
   if (!units.length) { if (!silent) toast("⚠️ 词库解析为空：" + src.name); return false; }
   const i = BOOKS.findIndex((b) => b.id === src.id);
   if (i >= 0) BOOKS.splice(i, 1);
-  BOOKS.push({ id: src.id, stage: "动态词库", name: src.name, color: src.color, units });
+  BOOKS.push({ id: src.id, stage: src.stage || "扩展词库", name: src.name, color: src.color, units });
   buildAll();
   if (!silent && fromCache) toast("📖 " + src.name + "（缓存）");
   if (!silent) toast("📖 " + src.name + " 已加载");
@@ -1853,7 +1877,7 @@ function renderHome() {
       (b) =>
         `<button class="bktab ${b.id === S.curBook ? "on" : ""}" style="--bc:${
           b.color
-        }" onclick="pickBook('${b.id}')">${b.name.replace(" · ", "")}</button>`
+        };--stc:${stageColor(b.stage)}" onclick="pickBook('${b.id}')">${b.name.replace(" · ", "")}</button>`
     )
     .join("");
   // 扩展词库始终显示名称（未加载也可选中），选中后在下方动态区设置词量/次序并懒加载
@@ -1861,7 +1885,7 @@ function renderHome() {
     (s) =>
       `<button class="bktab dyn ${s.id === S.curBook ? "on" : ""}" style="--bc:${
         s.color
-      }" title="${s.name} · 扩展词库每日精练" onclick="pickBook('${s.id}')">${s.name}</button>`
+      };--stc:${stageColor(s.stage)}" title="${s.name} · ${s.stage ? s.stage + " · " : ""}扩展词库每日精练" onclick="pickBook('${s.id}')">${s.name}</button>`
   ).join("");
   // 顺序/随机切换按钮（仅内置闯关相关）
   tabsHtml += `<button class="bktab order-btn" onclick="toggleWordOrder()" style="--bc:var(--c-c);margin-left:auto;">${
@@ -1881,7 +1905,7 @@ function renderHome() {
     // ── 扩展词库·每日精练动态区 ──
     const cfg = dynCfg(dynSrc.id);
     $("#heroName").textContent = dynSrc.name;
-    $("#heroTag").textContent = "扩展词库";
+    $("#heroTag").textContent = dynSrc.stage ? "扩展 · " + dynSrc.stage : "扩展词库";
     $("#heroTag").style.background = dynSrc.color;
     $("#heroMeta").textContent = b
       ? `${b.items.length} 词条 · 每日精练 ${cfg.daily} 词/天`
