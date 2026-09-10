@@ -1792,6 +1792,15 @@ function refreshHead() {
   $("#btnOsk").classList.toggle("off", (S.set.osk || "auto") === "off");
   $("#btnSound").textContent = S.set.sound ? "🔔" : "🔕";
   $("#btnTts").textContent = S.set.tts ? "🔊" : "🔇";
+  // 顶部用户卡片：头像 + 用户名
+  const pf = S.profile || {};
+  const ua = $("#userAvatar");
+  const un = $("#userName");
+  if (ua) ua.textContent = pf.avatar || "🧑";
+  if (un) {
+    const nm = (pf.name || "").trim();
+    un.textContent = nm ? (nm.length > 6 ? nm.slice(0, 6) + "…" : nm) : "未命名";
+  }
 }
 $("#btnSound").onclick = () => {
   S.set.sound = !S.set.sound;
@@ -2400,6 +2409,7 @@ function saveProfile() {
   if (!pfDraft.moodEmoji) pfDraft.moodEmoji = "😀";
   S.profile = Object.assign({}, pfDraft);
   save();
+  refreshHead();
   const back = pfBack;
   pfBack = null;
   closeModal();
