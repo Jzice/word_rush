@@ -1641,6 +1641,46 @@ function masteryDist() {
   const mastered = lv[5];
   return { lv, learned, mastered, touched };
 }
+/* SRS 强度分布：间隔分布、EF 分布、未来到期预测 */
+function srsDist() {
+  const ivBuckets = [0, 0, 0, 0, 0, 0, 0, 0]; // 0天/1-3/4-7/8-14/15-30/31-60/61-180/180+
+  const ivLabels = ["0d", "1-3", "4-7", "8-14", "15-30", "31-60", "61-180", "180+"];
+  const efBuckets = [0, 0, 0, 0, 0, 0]; // 1.3-1.5/1.5-1.8/1.8-2.1/2.1-2.4/2.4-2.6/2.6-2.8
+  const efLabels = ["1.3-", "1.5-", "1.8-", "2.1-", "2.4-", "2.6-2.8"];
+  const now = Date.now();
+  let learned = 0;
+  for (const m of Object.values(S.mastery)) {
+    if (!m.r) continue;
+    learned++;
+    const iv = m.iv || 0;
+    if (iv <= 0) ivBuckets[0]++;
+    else if (iv <= 3) ivBuckets[1]++;
+    else if (iv <= 7) ivBuckets[2]++;
+    else if (iv <= 14) ivBuckets[3]++;
+    else if (iv <= 30) ivBuckets[4]++;
+    else if (iv <= 60) ivBuckets[5]++;
+    else if (iv <= 180) ivBuckets[6]++;
+    else ivBuckets[7]++;
+    const ef = m.ef || 2.5;
+    if (ef < 1.5) efBuckets[0]++;
+    else if (ef < 1.8) efBuckets[1]++;
+    else if (ef < 2.1) efBuckets[2]++;
+    else if (ef < 2.4) efBuckets[3]++;
+    else if (ef < 2.6) efBuckets[4]++;
+    else efBuckets[5]++;
+  }
+  // 未来到期预测（累计）：1/3/7/14/30 天后到期的词数
+  const forecastDays = [1, 3, 7, 14, 30];
+  const forecast = forecastDays.map((d) => 0);
+  for (const m of Object.values(S.mastery)) {
+    if (!m.r) continue;
+    const daysToDue = Math.max(0, Math.ceil((m.due - now) / SRS_DAY));
+    for (let i = 0; i < forecastDays.length; i++) {
+      if (daysToDue <= forecastDays[i]) forecast[i]++;
+    }
+  }
+  return { ivBuckets, ivLabels, efBuckets, efLabels, forecast, forecastDays, learned };
+}
 
 /* ================= 学习信息卡片 ================= */
 function phLine(it) {
@@ -2160,6 +2200,32 @@ function renderHome() {
   $("#btnReview").disabled = !due;
   $("#wrongN").textContent = wr;
   $("#btnWrong").disabled = !wr;
+  // ── 今日任务卡：待复习 + 新学目标 + 进度条 + 一键开始 ──
+  const freshGoal = dynSrc ? dynCfg(dynSrc.id).daily : 20;
+  const goal = due + freshGoal;
+  const done = dstat.words || 0;
+  const pct = goal ? Math.min(100, Math.round((done / goal) * 100)) : 0;
+  const startLabel = due ? "🔁 先复习到期词" : dynSrc ? "▶ 开始今日练习" : "▶ 开始闯关";
+  const startFn = due
+    ? "document.getElementById('btnReview').click()"
+    : dynSrc
+    ? "document.getElementById('btnDynStart').click()"
+    : "document.getElementById('btnStart').click()";
+  $("#todayTask").innerHTML = goal
+    ? `<div class="task-card">
+        <div class="task-head">
+          <span class="task-title">🎯 今日任务</span>
+          <span class="task-pct"><b style="color:var(--c-y)">${done}</b> / ${goal} 词 · ${pct}%</span>
+        </div>
+        <div class="task-bar"><i style="width:${pct}%"></i></div>
+        <div class="task-body">
+          <div class="task-item"><span class="tk-due">⏰ 待复习</span><b>${due}</b></div>
+          <div class="task-item"><span class="tk-fresh">🌱 新学目标</span><b>${freshGoal}</b></div>
+          <div class="task-item"><span class="tk-done">✅ 已完成</span><b>${done}</b></div>
+        </div>
+        <button class="btn solid task-btn" onclick="${startFn}">${startLabel}</button>
+      </div>`
+    : "";
   refreshHead();
 }
 window.pickBook = (id) => {
@@ -3961,7 +4027,8 @@ function runFailWord() {
 }
 function runComplete() {
   const it = G.queue[G.idx];
-  markWord(it, true, G.curErrs, Date.now() - (G.wordT0 || Date.now()));
+  const rt = Date.now() - (G.wordT0 || Date.now());
+  markWord(it, true, G.curErrs, rt);
   S.stats.words++;
   G.correct++;
   G.combo++;
@@ -3976,6 +4043,19 @@ function runComplete() {
   floaty(r.right, r.top, "+" + gain, "var(--ok)");
   sOk();
   if (G.curErrs > 0) G.wrong.push(it);
+  // 会话内滞后再现：拼对但错键多(≥2)或反应过慢的词，本局结束前再出现一次
+  const slowBudget = (1200 + it.en.length * 500) * 1.6;
+  const needReplay =
+    G.curErrs >= 2 || (rt > 0 && rt > slowBudget);
+  if (
+    needReplay &&
+    !G.retried.has(it.en.toLowerCase()) &&
+    G.mode !== "time"
+  ) {
+    G.retried.add(it.en.toLowerCase());
+    G.queue.push({ ...it });
+    floaty(innerWidth / 2, r.top - 40, "🔁 稍后再见", "var(--c-p)");
+  }
   if (G.mode === "time" && S.set.tts) speak(it.en);
   updateRunHud();
   G.idx++;
@@ -5066,6 +5146,7 @@ function renderStats() {
   const all = sumRange(dailyRange(0)); // 累计（自有记录以来）
   const duelTotal = (S.stats.p2pWins || 0) + (S.stats.p2pLosses || 0);
   const dist = masteryDist();
+  const srs = srsDist();
   const due = dueWords().length,
     wrong = wrongWords().length;
   const totalWords = ALL.filter((w) => !w.phrase).length;
@@ -5144,6 +5225,30 @@ function renderStats() {
     </div>
   </div>
   <div class="panel">
+    <h3 class="chart-title">📊 SRS 记忆强度分析</h3>
+    <div class="srs-grid">
+      <div class="srs-chart-box">
+        <div class="srs-chart-title">间隔分布（天）</div>
+        <canvas id="ivChart" height="180"></canvas>
+      </div>
+      <div class="srs-chart-box">
+        <div class="srs-chart-title">难度系数 EF 分布</div>
+        <canvas id="efChart" height="180"></canvas>
+      </div>
+    </div>
+    <div class="srs-forecast">
+      <div class="srs-chart-title">📅 未来到期复习预测（累计）</div>
+      <div class="srs-fc-cards">
+        ${srs.forecastDays
+          .map(
+            (d, i) =>
+              `<div class="srs-fc-card"><b style="color:var(--c-p)">${srs.forecast[i]}</b><span>${d} 天内</span></div>`
+          )
+          .join("")}
+      </div>
+    </div>
+  </div>
+  <div class="panel">
     <h3 class="chart-title">🎮 挑战模式数据</h3>
     <div class="mode-tiles">
       <div class="mtile"><span class="mic">⏱</span><b>${s.mTime}</b><span>限时冲刺 · 累计 ${all.mTime}</span></div>
@@ -5175,6 +5280,7 @@ function renderStats() {
     }</div>
   </div>`;
   requestAnimationFrame(() => drawLearnChart(rows));
+  requestAnimationFrame(() => drawSrsCharts(srs));
 }
 /* Canvas 学习曲线：柱状=每日单词数，折线=正确率 */
 function drawLearnChart(rows) {
@@ -5288,6 +5394,74 @@ function drawLearnChart(rows) {
     if (i % labelEvery !== 0 && i !== n - 1) return;
     ctx.fillText(d.date.slice(5).replace("-", "/"), padL + step * i + step / 2, H - 8);
   });
+}
+
+/* Canvas SRS 分布图：间隔分布 + EF 分布（柱状图） */
+function drawSrsCharts(srs) {
+  const css = (v) => getComputedStyle(document.body).getPropertyValue(v).trim();
+  const cP = css("--c-p") || "#7c4dff",
+    cC = css("--c-c") || "#29b6f6",
+    cSub = css("--sub") || "#8a93a3",
+    cLine = css("--line") || "rgba(255,255,255,.15)",
+    cPanel = css("--panel") || "rgba(255,255,255,.06)";
+  const drawBar = (cvId, labels, buckets, color) => {
+    const cv = $("#" + cvId);
+    if (!cv) return;
+    const cssW = cv.clientWidth || cv.parentElement.clientWidth || 300;
+    const dpr = window.devicePixelRatio || 1;
+    const H = 180;
+    cv.width = cssW * dpr;
+    cv.height = H * dpr;
+    cv.style.height = H + "px";
+    const ctx = cv.getContext("2d");
+    ctx.scale(dpr, dpr);
+    const W = cssW,
+      padL = 28,
+      padR = 10,
+      padT = 12,
+      padB = 24;
+    const plotW = W - padL - padR,
+      plotH = H - padT - padB;
+    ctx.clearRect(0, 0, W, H);
+    const maxV = Math.max(1, ...buckets);
+    const n = buckets.length;
+    const barW = Math.max(6, (plotW / n) * 0.7);
+    const step = plotW / n;
+    // 网格
+    ctx.font = "10px sans-serif";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 3; i++) {
+      const y = padT + (plotH / 3) * i;
+      ctx.strokeStyle = cLine;
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(W - padR, y);
+      ctx.stroke();
+      ctx.fillStyle = cSub;
+      ctx.textAlign = "right";
+      ctx.fillText(Math.round(maxV - (maxV / 3) * i), padL - 4, y + 3);
+    }
+    // 柱子
+    buckets.forEach((v, i) => {
+      const x = padL + step * i + (step - barW) / 2;
+      const y = padT + plotH - (v / maxV) * plotH;
+      if (v > 0) {
+        const g = ctx.createLinearGradient(0, y, 0, padT + plotH);
+        g.addColorStop(0, color);
+        g.addColorStop(1, color + "44");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        const r = Math.min(3, barW / 2);
+        ctx.roundRect(x, y, barW, padT + plotH - y, [r, r, 0, 0]);
+        ctx.fill();
+      }
+      ctx.fillStyle = cSub;
+      ctx.textAlign = "center";
+      ctx.fillText(labels[i], padL + step * i + step / 2, H - 8);
+    });
+  };
+  drawBar("ivChart", srs.ivLabels, srs.ivBuckets, cC);
+  drawBar("efChart", srs.efLabels, srs.efBuckets, cP);
 }
 
 /* ---------- 商店 ---------- */

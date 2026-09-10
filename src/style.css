@@ -616,6 +616,71 @@ h2.sec {
   color: var(--sub);
   margin: 4px 0 10px;
 }
+/* ── 今日任务卡 ── */
+.task-card {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--panel), var(--bg));
+  border: 1.5px solid var(--line);
+}
+.task-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.task-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.task-pct {
+  font-size: 0.8rem;
+  color: var(--sub);
+}
+.task-bar {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--line);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.task-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--c-c), var(--c-y));
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+.task-body {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.task-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+.task-item span {
+  font-size: 0.7rem;
+  color: var(--sub);
+}
+.task-item b {
+  font-size: 1.2rem;
+  font-family: "Bungee";
+}
+.tk-due { color: var(--c-p); }
+.tk-fresh { color: var(--ok); }
+.tk-done { color: var(--c-c); }
+.task-btn {
+  width: 100%;
+}
 .col-side {
   display: flex;
   flex-direction: column;
@@ -2369,6 +2434,53 @@ footer {
   gap: 6px 14px;
   font-size: 0.72rem;
   color: var(--sub);
+}
+/* ── SRS 记忆强度分析 ── */
+.srs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.srs-chart-box {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 10px 12px 4px;
+}
+.srs-chart-title {
+  font-size: 0.78rem;
+  color: var(--sub);
+  margin-bottom: 4px;
+}
+.srs-forecast {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.srs-fc-cards {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.srs-fc-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+.srs-fc-card b {
+  font-size: 1.3rem;
+  font-family: "Bungee";
+}
+.srs-fc-card span {
+  font-size: 0.7rem;
+  color: var(--sub);
+}
+@media (max-width: 560px) {
+  .srs-grid { grid-template-columns: 1fr; }
 }
 .mode-tiles {
   display: grid;
