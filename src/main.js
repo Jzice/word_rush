@@ -3707,27 +3707,6 @@ document.addEventListener("keydown", (e) => {
       e.preventDefault();
       return;
     }
-    const map = {
-      r: "#btnReview",
-      w: "#btnWrong",
-      m: () => openMode("memory"),
-      t: () => openMode("time"),
-      f: () => openMode("fall"),
-      b: () => openMode("battle"),
-      l: () => go("scr-table"),
-      p: () => go("scr-book"),
-      s: () => go("scr-shop"),
-      d: () => go("scr-stats"),
-    };
-    if (map[key]) {
-      const v = map[key];
-      if (typeof v === "string") {
-        const el = document.querySelector(v);
-        if (el) el.click();
-      } else v();
-      e.preventDefault();
-      return;
-    }
   }
   if (e.key === "Escape") {
     handleEsc();
