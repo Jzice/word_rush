@@ -2205,12 +2205,10 @@ function renderHome() {
   const goal = due + freshGoal;
   const done = dstat.words || 0;
   const pct = goal ? Math.min(100, Math.round((done / goal) * 100)) : 0;
-  const startLabel = due ? "🔁 先复习到期词" : dynSrc ? "▶ 开始今日练习" : "▶ 开始闯关";
-  const startFn = due
-    ? "document.getElementById('btnReview').click()"
-    : dynSrc
-    ? "document.getElementById('btnDynStart').click()"
-    : "document.getElementById('btnStart').click()";
+  // 仅在有待复习词时显示「先复习」按钮；无待复习词时不显示，避免与下方开始按钮重复
+  const taskBtn = due
+    ? `<button class="btn solid task-btn" onclick="document.getElementById('btnReview').click()">🔁 先复习到期词</button>`
+    : "";
   $("#todayTask").innerHTML = goal
     ? `<div class="task-card">
         <div class="task-head">
@@ -2223,7 +2221,7 @@ function renderHome() {
           <div class="task-item"><span class="tk-fresh">🌱 新学目标</span><b>${freshGoal}</b></div>
           <div class="task-item"><span class="tk-done">✅ 已完成</span><b>${done}</b></div>
         </div>
-        <button class="btn solid task-btn" onclick="${startFn}">${startLabel}</button>
+        ${taskBtn}
       </div>`
     : "";
   refreshHead();
