@@ -2309,6 +2309,29 @@ function p2pBindBookOpts(sel) {
     };
   });
 }
+/* 生成邀请链接：?room=<房间码>&mode=duel|room，对方打开即自动加入 */
+function p2pInviteUrl(mode) {
+  const u = new URL(location.href);
+  u.searchParams.delete("challenge"); // 邀请链接只做邀请，避免对方同时触发闯关
+  u.searchParams.set("room", p2pRoom);
+  u.searchParams.set("mode", mode || p2pMode || "duel");
+  return u.toString();
+}
+/* 分享按钮组（复制链接 + 可选系统分享），房主大厅/等待卡片共用 */
+function p2pShareBtns(mode) {
+  const url = p2pInviteUrl(mode);
+  return (
+    `<div class="p2p-share"><button class="btn y sm" onclick="copyShareLink('${escA(
+      url
+    )}')">📋 复制邀请链接</button>` +
+    (navigator.share
+      ? `<button class="btn c sm" onclick="navigator.share({title:'WORD RUSH 联机对战',text:'快来和我一起单词对战！',url:'${escA(
+          url
+        )}'})">📱 分享</button>`
+      : "") +
+    `</div>`
+  );
+}
 /* 房主按所选词库生成本局统一词表（未加载的扩展词库先惰性加载；失败回退混合词库） */
 async function p2pBuildWords() {
   let pool = ALL;
@@ -2406,7 +2429,9 @@ function p2pCreateRoom() {
     $("#p2pRoomDisplay").style.display = "block";
     $(
       "#p2pRoomDisplay"
-    ).innerHTML = `<div>📋 房间码</div><div class="room-code">${id}</div><div style="font-size:.7rem;color:var(--sub)">等待对手加入...</div>`;
+    ).innerHTML = `<div>📋 房间码</div><div class="room-code">${id}</div><div style="font-size:.7rem;color:var(--sub);margin:4px 0">等待对手加入... 也可直接发链接邀请</div>${p2pShareBtns(
+      "duel"
+    )}`;
     $("#p2pStatus").innerHTML =
       '<span class="p2p-status connecting"><span class="dot"></span>等待连接...</span>';
     toast("🏠 房间已创建", "房间码: " + id);
@@ -2420,12 +2445,13 @@ function p2pCreateRoom() {
     toast("❌ 创建房间失败", e.message);
   });
 }
-function p2pJoinRoom() {
-  const code = $("#p2pJoinInput").value.trim();
+function p2pJoinRoom(code) {
+  code = (code !== undefined ? code : $("#p2pJoinInput").value).trim();
   if (!code) {
     toast("请输入房间码");
     return;
   }
+  p2pLastRoomCode = code;
   if (peer) peer.destroy();
   peer = new Peer({ debug: 2 });
   isHost = false;
@@ -2503,7 +2529,8 @@ function sendP2P(data) {
 function p2pDuelLobby() {
   const me = S.profile || {};
   openModal(
-    `<h3>⚔️ 单挑房间</h3><div class="sub">房间码 <span class="room-code" style="font-size:1.05rem;letter-spacing:2px;padding:2px 10px">${p2pRoom}</span> · 把房间码发给对手</div>
+    `<h3>⚔️ 单挑房间</h3><div class="sub">房间码 <span class="room-code" style="font-size:1.05rem;letter-spacing:2px;padding:2px 10px">${p2pRoom}</span></div>
+     ${p2pShareBtns("duel")}
      <div class="room-list" style="text-align:left;margin:10px 0">
        <div class="room-mem"><span>${me.avatar || "🧑"} ${escHtml(me.name || "你")}（我 · 房主）</span><b style="color:var(--c-y)">房主</b></div>
        <div class="room-mem"><span id="duelOppNm">⏳ 等待对手加入...</span><b id="duelOppSt"></b></div>
@@ -2985,8 +3012,8 @@ function roomCreate() {
     toast("❌ 创建房间失败", e.message);
   });
 }
-function roomJoin() {
-  const code = $("#p2pJoinInput").value.trim();
+function roomJoin(code) {
+  code = (code !== undefined ? code : $("#p2pJoinInput").value).trim();
   if (!code) {
     toast("请输入房间码");
     return;
@@ -3298,7 +3325,7 @@ function roomRenderLobby() {
   openModal(
     `<h3>🏠 房间 <span class="room-code" style="font-size:1.15rem;letter-spacing:2px;padding:2px 12px">${p2pRoom}</span></h3><div class="sub">${
       isHost ? "你是房主" : "已加入房间"
-    } · 上限 ${roomMax} 人 · 房主可随时开始</div><div class="room-list" id="roomLobby">${
+    } · 上限 ${roomMax} 人 · 房主可随时开始</div>${p2pShareBtns("room")}<div class="room-list" id="roomLobby">${
       rows || '<div class="sub" style="padding:8px">等待成员加入...</div>'
     }</div>${head}`
   );
@@ -3331,6 +3358,49 @@ function roomRenderLanes() {
     })
     .join("");
 }
+
+/* ---------- 邀请链接：自动加入 ---------- */
+/* 通过邀请链接进入：打开对应模式弹窗、填入房间码并立即连接房主 */
+function p2pAutoJoin(code, mode) {
+  p2pLastRoomCode = code;
+  if (mode === "room") {
+    openRoomMode();
+    roomShowJoin();
+    $("#p2pJoinInput").value = code;
+    toast("🔗 正在通过邀请链接加入乱斗房间...");
+    roomJoin(code);
+  } else {
+    openDuelMode();
+    p2pShowJoin();
+    $("#p2pJoinInput").value = code;
+    toast("🔗 正在通过邀请链接加入单挑房间...");
+    p2pJoinRoom(code);
+  }
+}
+/* 启动时检测邀请链接 ?room=<房间码>&mode=duel|room → 等 PeerJS（defer 加载）就绪后自动加入 */
+(function checkP2PInvite() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get("room");
+  if (!code) return;
+  const mode = params.get("mode") === "room" ? "room" : "duel";
+  // 清掉邀请参数，避免刷新/收藏导致重复自动加入
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete("room");
+    u.searchParams.delete("mode");
+    history.replaceState(null, "", u.pathname + u.search + u.hash);
+  } catch (e) {}
+  let tries = 0;
+  const timer = setInterval(() => {
+    if (typeof Peer !== "undefined") {
+      clearInterval(timer);
+      setTimeout(() => p2pAutoJoin(code, mode), 300);
+    } else if (++tries > 60) {
+      clearInterval(timer);
+      toast("⚠️ 联机组件加载失败，请检查网络后手动输入房间码：" + code);
+    }
+  }, 200);
+})();
 
 /* ================= 游戏核心 ================= */
 let G = null;

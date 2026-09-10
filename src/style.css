@@ -2107,6 +2107,13 @@ footer {
   font-family: inherit;
   font-size: 0.85rem;
 }
+.p2p-share {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 10px 0 4px;
+}
 .room-list {
   display: flex;
   flex-direction: column;
