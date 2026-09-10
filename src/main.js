@@ -3721,9 +3721,37 @@ document.addEventListener("keydown", (e) => {
     routeChar(e.key.toLowerCase());
   }
 });
+/* 获取当前待输入的目标字符（用于空格替代非字母字符） */
+function curTargetChar() {
+  if (!G || !G.active) return null;
+  if (G.type === "run" || G.type === "battle" || G.type === "p2p") {
+    const it = G.queue[G.idx];
+    return it ? it.en[G.typed] : null;
+  }
+  if (G.type === "mem") {
+    const it = cur();
+    return it ? it.en[G.typed] : null;
+  }
+  if (G.type === "fall") {
+    if (G.target) return G.target.it.en[G.target.matched];
+    // 无锁定目标时，选位置最低（最紧急）的首字母非字母单词
+    const cands = G.words.filter((w) => !/[a-z]/i.test(w.it.en[0]));
+    if (cands.length) {
+      const w = cands.reduce((a, b) => (a.y > b.y ? a : b));
+      return w.it.en[0];
+    }
+    return null;
+  }
+  return null;
+}
 function routeChar(ch) {
   if (!G || !G.active) return;
   ch = String(ch).toLowerCase();
+  // 屏幕键盘只有字母+空格；单词中的连字符、撇号等非字母字符统一用空格代替输入
+  if (ch === " ") {
+    const tc = curTargetChar();
+    if (tc && !/[a-z]/.test(tc)) ch = tc.toLowerCase();
+  }
   if (G.type === "run") onRunChar(ch);
   else if (G.type === "fall") onFallChar(ch);
   else if (G.type === "battle") onBattleChar(ch);
