@@ -1,42 +1,74 @@
 # AGENTS.md
 
-WORD RUSH 单词快打 — vanilla JS single-page vocabulary typing game (multiple school textbook 词库). No framework, no bundler, no tests. All logic lives in one file by design — keep it that way (no imports, no code splitting).
+WORD RUSH 单词快打 — vanilla JS single-page vocabulary typing game (multiple school textbook 词库). No framework, no bundler, no tests. Source is split into domain modules under `src/` — **classic scripts sharing one global scope, not ES modules** (so `file://` 双击即玩 keeps working). Load order is load-bearing; never reorder.
 
 ## Commands
 
-- `npm run dev` — `npx serve .` serves the repo root; `index.html` loads `src/main.js` + `src/style.css` directly (no build needed to develop)
-- `npm run build` — `node build.mjs` inlines CSS/JS into single `dist/word_rush.html` (gitignored), **minified + obfuscated** via terser (`mangle` local names) + clean-css
+- `npm run dev` — `npx serve .` serves the repo root; `index.html` loads the 27 module scripts + `src/style.css` directly in order (no build needed to develop)
+- `npm run build` — `node build.mjs` concatenates all `src/` JS/CSS modules (order from `index.html` tags) and inlines them into single `dist/word_rush.html` (gitignored), **minified + obfuscated** via terser (`mangle` local names) + clean-css
 - `npm run build:dev` — same inlining **without** minification/obfuscation (debug-friendly; readable source in the bundle)
 - No lint / typecheck / test scripts exist. Verify changes with `npm run build` + browser testing (e.g. Playwright) — nothing else validates the code.
 
 ## Architecture
 
-- `index.html` — markup with inline `onclick` handlers (e.g. `go('scr-book')`, `openMode('time')`) that call **global** functions
-- `src/main.js` (~3600 lines) — all game logic: `BOOKS` word data, 5 game modes (`run`/`fall`/`battle`/`mem`/`p2p`), shop, achievements, leveling, P2P
-- `src/style.css` (~2000 lines) — all styling; themes via `body[data-theme]` + CSS vars (`--c-y`, `--c-p`, ...)
-- Word data is **inline code** in the `BOOKS` array (`src/main.js:45`), not external data files
+- `index.html` — markup with inline `onclick` handlers (e.g. `go('scr-book')`, `openMode('time')`) that call **global** functions; script tags at the end of `<body>` load modules **in dependency order** (= original single-file line order)
+- Module map (load order; each file header comment registers 职责/依赖/共享状态):
+
+| # | 文件 | 职责 |
+|---|---|---|
+| 1 | `src/core/utils.js` | 工具 + 全局常量（`$`/`$$`/`rnd`/`pick`/`shuffle`/`escHtml`/`P()`/`POS`/`LVN`/`K`） |
+| 2 | `src/data/books.js` | `BOOKS` 内置词库数据（人教版/外研版/新概念/KET/四六级） |
+| 3 | `src/data/dynamic.js` | 动态词库：`DYN_SOURCES`/CSV 解析/缓存/惰性加载/每日精练 |
+| 4 | `src/data/index.js` | `ALL`/`buildAll()`/`bookOf()` |
+| 5 | `src/data/phrases.js` | `PHRASES` 短语库 |
+| 6 | `src/core/store.js` | 存档：`def()`/`S`/`save()`/`mOf()` |
+| 7 | `src/core/srs.js` | SM-2 改进 SRS 算法/队列/权重池/迁移 IIFE |
+| 8 | `src/core/stats.js` | 等级/头衔/每日统计/掌握度分布 |
+| 9 | `src/ui/render.js` | `phLine`/`wordCard` 词卡渲染 |
+| 10 | `src/ui/audio.js` | WebAudio 音效（`beep`/`sTick`/`sOk`…）+ TTS `speak()` |
+| 11 | `src/ui/shell.js` | `go()` 切屏/`refreshHead()`/屏幕键盘 |
+| 12 | `src/ui/fx.js` | `toast`/`burst`/`floaty`/`coinBump` |
+| 13 | `src/screens/achievements.js` | 成就/分享/`?challenge=` 自动开局 IIFE |
+| 14 | `src/screens/home.js` | 主页/动态词库面板/模态框/个人资料/错词本 |
+| 15 | `src/screens/mode-select.js` | `openMode` 模式设置弹窗 + `#goBtn` 分发 |
+| 16 | `src/net/p2p.js` | PeerJS 1v1 单挑 + 多人房间 + `?room=` IIFE（最大文件，~1100 行） |
+| 17 | `src/game/core.js` | 对局运行态 `G`/全局 keydown 路由/生命周期/HUD/道具 |
+| 18 | `src/game/mode-run.js` | 闯关/限时/复习/每日 |
+| 19 | `src/game/mode-mem.js` | 花瓣记忆 |
+| 20 | `src/game/mode-fall.js` | 陨石单词 |
+| 21 | `src/game/mode-battle.js` | 人机/同屏 2P |
+| 22 | `src/screens/result.js` | 五模式共用结算 `showResult` |
+| 23 | `src/screens/book.js` | 单词本 |
+| 24 | `src/screens/table.js` | 单词表 |
+| 25 | `src/screens/stats.js` | 学习数据 + Canvas 图表 |
+| 26 | `src/screens/shop.js` | 主题/道具商店 |
+| 27 | `src/boot.js` | 环境漂浮粒子 + 启动序列（`buildOsk`→`refreshHead`→curBook 兜底→`renderHome`） |
+
+- `src/style.css` (~2000 lines) — all styling; themes via `body[data-theme]` + CSS vars (`--c-y`, `--c-p`, ...). 尚未拆分（级联顺序敏感，收益低于 JS）
+- Word data is **inline code** in the `BOOKS` array (`src/data/books.js`), not external data files
 
 ## Critical quirks
 
-- **Classic script, not a module.** Top-level `function` declarations become globals usable from inline `onclick`, but top-level `const`/`let` do NOT. Arrow functions referenced from `index.html` inline handlers MUST be explicitly attached: `window.foo = () => {...}` (see `window.useTheme`/`window.buyItem` near the end of `main.js`).
-- **Build inlining is regex-based.** `build.mjs` only substitutes the exact tag patterns `<link ... href="src/style.css">` and `<script src="src/main.js"></script>` (a leading `/` is tolerated). Rename a file, add attributes, or change the path → build silently outputs a broken `dist/word_rush.html`. Keep those two tags byte-for-byte as-is.
+- **Classic scripts, not modules.** All modules share one global scope: top-level `function` declarations become globals usable from inline `onclick`; top-level `const`/`let` enter the global lexical environment and resolve **across files by load order**. Arrow functions referenced from `index.html` inline handlers MUST be explicitly attached: `window.foo = () => {...}` (see `window.useTheme`/`window.buyItem` in `src/screens/shop.js`). Do NOT convert to `type="module"` — it breaks `file://` double-click play.
+- **Load order is load-bearing.** The 27-tag order in `index.html` equals the original single-file line order and `EXPECTED_JS` in `build.mjs` — all three must stay in sync. Top-level immediate code (IIFEs: `checkChallenge`, `checkP2PInvite`, ambient particles; DOM bindings; the boot sequence in `src/boot.js`) executes at its file's position in that order. Moving/renaming a file without updating both `index.html` and `build.mjs` fails the build loudly (see below) — never reorder declarations.
+- **Build is manifest-validated, not silent.** `build.mjs` collects every `<script src="src/*.js">` / `<link href="src/*.css">` from `index.html` in order, concatenates them, then inlines into `dist/word_rush.html`. Before writing it runs three checks and **exits non-zero on any mismatch**: ① collected list === `EXPECTED_JS`/`EXPECTED_CSS` (order + content), ② every referenced file exists and is non-empty, ③ no orphan `.js`/`.css` left in `src/` unreferenced. Tag format must stay `<script src="src/....js"></script>` / `<link ... href="src/....css" ...>` (leading `/` tolerated).
 - **Obfuscation keeps top-level names.** terser runs with `mangle.toplevel: false` (default) — top-level `function` declarations and `window.x` property names are preserved so inline `onclick` keeps working. Only local names inside functions get mangled. If you ever add a script-level rename/obfuscation step, verify inline `onclick` handlers still resolve.
 - **Built file is not fully offline.** Google Fonts and PeerJS (from `unpkg`) stay as external CDN refs in `dist/word_rush.html` — custom fonts and P2P 联机对战 need network at runtime.
-- **Single global `keydown` listener** (`src/main.js:2082`). During gameplay every printable char routes through `routeChar(ch)` → per-mode handler by `G.type`. A new game mode must branch in `routeChar` and manage the `G` object. On the home screen, keys 1-9 select units and r/w/m/t/f/b/l/p/s shortcut screens. Input is ignored when focus is in `INPUT|SELECT|TEXTAREA`.
-- **Persistence is manual.** State lives in localStorage under key `wordrush_v1` (`const K`), schema in `def()` (`src/main.js:1061`). Any mutation must call `save()` explicitly. Word mastery is keyed by `word.toLowerCase()` in `S.mastery` — renaming a word in `BOOKS` orphans its progress (there is no migration path).
+- **Single global `keydown` listener** (`src/game/core.js:10`). During gameplay every printable char routes through `routeChar(ch)` → per-mode handler by `G.type`. A new game mode must branch in `routeChar` and manage the `G` object. On the home screen, keys 1-9 select units and r/w/m/t/f/b/l/p/s shortcut screens. Input is ignored when focus is in `INPUT|SELECT|TEXTAREA` or when `modalOpen`/`!G.active`.
+- **Persistence is manual.** State lives in localStorage under key `wordrush_v1` (`const K`, `src/core/utils.js`), schema in `def()` (`src/core/store.js`). Any mutation must call `save()` explicitly. Word mastery is keyed by `word.toLowerCase()` in `S.mastery` — renaming a word in `BOOKS` orphans its progress (there is no migration path).
 
 ## Word data format
 
 - Unit words `w`: `en@中文@pos|en@中文@pos|...` (3 fields per entry)
 - Unit phrases `p`: `en@中文|en@中文|...` (2 fields; rendered pos is forced to `"e"`)
-- `@` and `|` are structural delimiters — never appear inside word/phrase text. `P()` (`src/main.js:26`) parses.
-- Parsed into `it` objects `{en, cn, book, phrase, pos, ui, un, us}` appended to `BOOKS[].items` and `ALL` (`src/main.js:577-601`); `ALL` is the flat lookup list used by gameplay.
+- `@` and `|` are structural delimiters — never appear inside word/phrase text. `P()` (`src/core/utils.js`) parses.
+- Parsed into `it` objects `{en, cn, book, phrase, pos, ui, un, us}` appended to `BOOKS[].items` and `ALL` (parse loop in `src/data/index.js`); `ALL` is the flat lookup list used by gameplay.
 
 ### 动态词库（DYN_SOURCES）
 
-- Config is a code-only array `DYN_SOURCES` near the top of `src/main.js` (after `BOOKS`): one entry per source `{ id, name, color, url }`. `url` is either an absolute `http(s)` URL (e.g. a Gitee-hosted CSV) or a server-relative path like `dict/x.csv`.
+- Config is a code-only array `DYN_SOURCES` in `src/data/dynamic.js` (after `BOOKS`): one entry per source `{ id, name, color, url }`. `url` is either an absolute `http(s)` URL (e.g. a Gitee-hosted CSV) or a server-relative path like `dict/x.csv`.
 - CSV schema `word,phonetic,pos,definition,source` (header optional; positional fallback `en,phonetic,pos,cn,source`). Rows missing en/cn are skipped; cells containing `@`/`|` are skipped (structural delimiters). Words are chunked into units of **50** (`s: "U1"…`, `n: "1-50"…`).
-- Loaded at startup by `loadDynamicBooks()` (async, after first `renderHome()`); per-source try/catch isolation — one failing source toasts `词库加载失败` and never blocks the others. `buildAll()` + `renderHome()` re-run after the batch so new books appear in tabs/dropdown/table automatically.
+- Loading is **lazy**, not a startup batch: `ensureDynLoaded(src)` (dedup via `dynLoadPromises`) fires from home tab render / 每日精练 / `#goBtn` (mode-select) / P2P 房主开局; per-source try/catch isolation — one failing source toasts `词库加载失败` and never blocks the others. `buildAll()` + `renderHome()` re-run after load so new books appear in tabs/dropdown/table automatically.
 - Cache: per-source localStorage key `wordrush_dyn_<id>` storing `{ ts, text }`, TTL 24h (`DYN_TTL`). Fresh cache → no network fetch; stale/missing → fetch; fetch failure → stale-cache fallback with toast.
 - **`id` 必须稳定** — renaming a source id orphans its `S.prog`/`S.mastery` progress (same rule as renaming a word in `BOOKS`; no migration path).
 - `file://` 双击打开时 `fetch` 被浏览器禁止 — 动态词库须用 `npm run dev`/`npx serve` 或部署到 http 服务。Built `dist/word_rush.html` 需要把 `dict/` 放在其同目录部署（构建产物不打包 `dict/`）。
@@ -46,3 +78,4 @@ WORD RUSH 单词快打 — vanilla JS single-page vocabulary typing game (multip
 - UI and code comments are Simplified Chinese — match the existing style.
 - Screens are `<section id="scr-X" class="scr">` toggled via `go(id)`; add new screens this way and reference them through globals.
 - Elements with a `data-t` attribute are clickable to read the word aloud (global click handler → `speak()`) — reuse for word pronunciation.
+- New module = new file in the right domain folder + Chinese header comment (职责/依赖/共享状态) + tag in `index.html` (correct position!) + entry in `EXPECTED_JS` (`build.mjs`). Keep files CRLF; comments in Chinese.

@@ -342,7 +342,43 @@
     <div class="modal hide" id="modal">
       <div class="mbox paper" id="mbox"></div>
     </div>
-    <script src="src/main.js"></script>
+    <!-- ═══ 模块脚本（经典脚本，按依赖序加载；顺序变更会破坏运行时语义） ═══ -->
+    <!-- core：基础层 -->
+    <script src="src/core/utils.js"></script>
+    <!-- data：词库数据 -->
+    <script src="src/data/books.js"></script>
+    <script src="src/data/dynamic.js"></script>
+    <script src="src/data/index.js"></script>
+    <script src="src/data/phrases.js"></script>
+    <!-- core：存档 / 算法 / 统计 -->
+    <script src="src/core/store.js"></script>
+    <script src="src/core/srs.js"></script>
+    <script src="src/core/stats.js"></script>
+    <!-- ui：渲染 / 音频 / 外壳 / 特效 -->
+    <script src="src/ui/render.js"></script>
+    <script src="src/ui/audio.js"></script>
+    <script src="src/ui/shell.js"></script>
+    <script src="src/ui/fx.js"></script>
+    <!-- screens：成就 / 主页 / 模式设置 -->
+    <script src="src/screens/achievements.js"></script>
+    <script src="src/screens/home.js"></script>
+    <script src="src/screens/mode-select.js"></script>
+    <!-- net：P2P 联机 -->
+    <script src="src/net/p2p.js"></script>
+    <!-- game：对局核心 + 5 种模式 -->
+    <script src="src/game/core.js"></script>
+    <script src="src/game/mode-run.js"></script>
+    <script src="src/game/mode-mem.js"></script>
+    <script src="src/game/mode-fall.js"></script>
+    <script src="src/game/mode-battle.js"></script>
+    <!-- screens：结算 / 单词本 / 单词表 / 学习数据 / 商店 -->
+    <script src="src/screens/result.js"></script>
+    <script src="src/screens/book.js"></script>
+    <script src="src/screens/table.js"></script>
+    <script src="src/screens/stats.js"></script>
+    <script src="src/screens/shop.js"></script>
+    <!-- boot：启动序列（必须最后） -->
+    <script src="src/boot.js"></script>
     <script defer src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   </body>
 </html>

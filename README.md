@@ -65,20 +65,28 @@ npm run build
 
 ### 📚 添加自定义词库
 
-在 `src/main.js` 顶部的 `DYN_SOURCES` 数组里加一行即可（代码配置，无设置界面）：
+在 `src/data/dynamic.js` 顶部的 `DYN_SOURCES` 数组里加一行即可（代码配置，无设置界面）：
 
 ```js
 { id: "mybook", name: "我的词库", color: "#5b9bd5", url: "dict/mybook.csv" },
 ```
 
-`url` 可以是服务器相对路径（如 `dict/mybook.csv`，构建后需与 `dist/word_rush.html` 同目录部署）或任意 http(s) CSV 链接。CSV 格式：`word,phonetic,pos,definition,source`（表头可选），每 50 词自动切一个单元。启动时自动加载并缓存 24 小时；网络失败时先用缓存，缓存也没有就提示一声并跳过该源，其它词书不受影响。
+`url` 可以是服务器相对路径（如 `dict/mybook.csv`，构建后需与 `dist/word_rush.html` 同目录部署）或任意 http(s) CSV 链接。CSV 格式：`word,phonetic,pos,definition,source`（表头可选），每 50 词自动切一个单元。打开对应词库标签/开局时按需加载并缓存 24 小时；网络失败时先用缓存，缓存也没有就提示一声并跳过该源，其它词书不受影响。
 
 ## 🗂 项目结构
 
-- `index.html` — 页面结构，内置 onclick 调用全局函数
-- `src/main.js` — 全部游戏逻辑（词库数据、五种模式、存档、商店、成就等）
+- `index.html` — 页面结构，内置 onclick 调用全局函数； body 末端按依赖序加载 27 个模块脚本
+- `src/` — 全部游戏逻辑，按功能域拆分为经典脚本模块（共享全局作用域，非 ES Modules，故 `file://` 双击即玩不受影响）：
+  - `core/` — 工具与常量、存档、SRS 记忆算法、等级统计
+  - `data/` — 词库数据：`books`（内置）、`dynamic`（动态词库/CSV/缓存）、`index`（全局词表）、`phrases`（短语库）
+  - `ui/` — 词卡渲染、音效与朗读、屏幕外壳（切屏/HUD/屏幕键盘）、反馈特效
+  - `screens/` — 成就、主页、模式设置、结算、单词本、单词表、学习数据、商店
+  - `game/` — 对局核心（`G`/输入路由/生命周期）+ 四种本地模式（闯关/记忆/陨石/对战）
+  - `net/` — P2P 联机（单挑 + 多人房间）
+  - `boot.js` — 启动序列（必须最后加载）
+  - 新增模块需同步 `index.html` 标签序与 `build.mjs` 的 `EXPECTED_JS` 清单，否则构建报错
 - `src/style.css` — 全部样式，主题通过 `body[data-theme]` + CSS 变量切换
-- `build.mjs` — 构建脚本：把 CSS/JS 内联进 `dist/word_rush.html`
+- `build.mjs` — 构建脚本：按清单顺序拼接 CSS/JS 并内联进 `dist/word_rush.html`（含引用一致性校验）
 - `dist/` — 构建产物（已 gitignore）
 
 ## ⌨️ 操作提示
