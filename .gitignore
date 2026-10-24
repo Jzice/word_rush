@@ -4,3 +4,5 @@ node_modules
 .vscode
 .claude-flow
 .playwright-mcp
+.playwright-cli
+serve.log
