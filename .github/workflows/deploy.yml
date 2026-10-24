@@ -1,0 +1,57 @@
+# GitHub Pages 自动发布：push 到 main 即构建并部署 https://<user>.github.io/<repo>/
+# 流程：npm ci → npm run build（内联压缩为 dist/word_rush.html）
+#       → 把 vocab/ 词库拷入 dist/vocab/ → 重命名为 dist/index.html
+#       → upload-pages-artifact → deploy-pages
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: # 允许在 Actions 页面手动触发
+
+# Pages 部署所需权限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只保留一个部署，新的推送取消进行中的旧部署
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm ci
+
+      - name: 构建单文件（压缩+内联）
+        run: npm run build
+
+      - name: 组装发布目录（词库 + index.html）
+        run: |
+          mkdir -p dist
+          cp -r vocab dist/vocab
+          mv dist/word_rush.html dist/index.html
+          ls -la dist dist/vocab
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

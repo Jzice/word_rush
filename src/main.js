@@ -657,6 +657,10 @@ function dynCacheSet(id, text) {
 }
 
 /* ================= 动态词库加载（按源隔离，失败不阻塞其它源） ================= */
+// 词库 URL 适配任意部署路径：DYN_SOURCES 里写 "/vocab/x.csv" 绝对路径，
+// 直接 fetch 在 GitHub Pages 子目录（https://user.github.io/repo/）会 404，
+// 这里统一相对当前页面解析（localStorage 缓存键仍用 id，不受影响）。
+const dynUrl = (u) => new URL(u.replace(/^\/+/, ""), document.baseURI).href;
 // 返回 Promise<boolean>：true = 成功加载（BOOKS 已含该词库），false = 失败。
 // opts.silent = true 时静默加载（后台缓存/惰性加载，不弹 toast，仅失败且无缓存时才提示）。
 async function applyDynamicBook(src, opts = {}) {
@@ -666,7 +670,7 @@ async function applyDynamicBook(src, opts = {}) {
   if (c && Date.now() - c.ts < DYN_TTL) { text = c.text; fromCache = true; }
   else {
     try {
-      const res = await fetch(src.url);
+      const res = await fetch(dynUrl(src.url));
       if (!res.ok) throw new Error("HTTP " + res.status);
       text = await res.text();
       dynCacheSet(src.id, text);
