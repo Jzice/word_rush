@@ -2,6 +2,12 @@
 
 多教材 · 多词库的词汇特训打字游戏。纯原生 JS 实现，无框架、无构建工具链，单文件即可发布运行。
 
+## 🌐 在线试玩
+
+### 👉 https://jzice.github.io/word_rush/
+
+由 GitHub Actions 自动构建部署（推送 `master` 或打 `v*` 版本标签即自动更新），无需安装，打开即玩。
+
 ## ✨ 功能
 
 - **多教材词库**：人教版（9 册）· 外研版（新标准）· 新概念第一册 · KET · 四级 · 六级
@@ -34,6 +40,22 @@ npm run build
 输出单一 HTML 文件 `dist/word_rush.html`（CSS/JS 已内联，双击即玩）。
 
 > 注意：构建产物中的自定义字体（Google Fonts）与联机对战（PeerJS）仍引用外部 CDN，离线环境下这两项不可用。
+
+### ⚙️ 自动发布（GitHub Actions）
+
+仓库内置两个工作流（`.github/workflows/`），推送即触发，无需手动操作：
+
+- `deploy.yml` — 推送 `master` / `main` 分支时，自动构建并部署到 [GitHub Pages](https://jzice.github.io/word_rush/)
+- `release.yml` — 推送 `v*` 标签时，自动完成版本发布 + 部署 Pages：
+
+  ```bash
+  git tag -a v1.1.0 -m "版本说明"
+  git push origin v1.1.0
+  ```
+
+  自动执行：构建单文件 → 创建 GitHub Release（自动生成 Release Notes，附带 `word_rush_v1.1.0.html` 单文件附件）→ 部署 Pages。
+
+> 前提：仓库 Settings → Pages 的 Source 选 `GitHub Actions`，且 `github-pages` 环境的 Deployment branches and tags 需包含 `v*` 标签模式（否则标签部署会被环境规则拦截）。
 
 ### 📚 添加自定义词库
 
