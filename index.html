@@ -336,6 +336,7 @@
     <footer>
       词库：人教版（9册）· 外研版（新标准）· 新概念第一册 · KET · 四级 · 六级 ·
       持续扩充中
+      <span class="ver" id="verTag" onclick="showAbout()" title="关于 WORD RUSH"></span>
     </footer>
     <div id="toasts"></div>
     <div id="fx"></div>
@@ -343,6 +344,8 @@
       <div class="mbox paper" id="mbox"></div>
     </div>
     <!-- ═══ 模块脚本（经典脚本，按依赖序加载；顺序变更会破坏运行时语义） ═══ -->
+    <!-- core：版本信息（须最先，无依赖） -->
+    <script src="src/core/version.js"></script>
     <!-- core：基础层 -->
     <script src="src/core/utils.js"></script>
     <!-- data：词库数据 -->
@@ -363,6 +366,8 @@
     <script src="src/screens/achievements.js"></script>
     <script src="src/screens/home.js"></script>
     <script src="src/screens/mode-select.js"></script>
+    <!-- screens：关于 -->
+    <script src="src/screens/about.js"></script>
     <!-- net：P2P 联机 -->
     <script src="src/net/p2p.js"></script>
     <!-- game：对局核心 + 5 种模式 -->

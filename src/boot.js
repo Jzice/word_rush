@@ -32,4 +32,5 @@
 buildOsk();
 refreshHead();
 if (!bookOf(S.curBook)) { S.curBook = "j1"; save(); }  // curBook 指向不存在的书（如未加载的动态书）→ 兜底回第 1 册
+$("#verTag").textContent = "v" + APP_VERSION; // 页脚版本徽标（点击 → showAbout）
 renderHome();

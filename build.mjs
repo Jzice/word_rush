@@ -4,10 +4,12 @@
 //   npm run build:dev      → 开发模式：仅内联，不压缩不混淆（便于调试）
 // ⚠ index.html 中本地 script/link 标签的顺序即模块加载顺序（经典脚本共享全局作用域，
 //   顶层 function 声明挂 window，供内联 onclick 调用；terser 以 mangle.toplevel:false 保留顶层名）。
-// ⚠ 构建期执行三重校验，任何不一致直接报错退出，杜绝「改文件名/路径后静默产出坏包」：
+// ⚠ 构建期执行多重校验，任何不一致直接报错退出，杜绝「改文件名/路径后静默产出坏包」：
 //   ① index.html 引用顺序/内容 == EXPECTED_JS / EXPECTED_CSS 预期清单
 //   ② 引用清单中的文件必须存在且非空
 //   ③ src/ 磁盘上的 .js/.css 必须全部被引用（无孤儿文件）
+//   ④ APP_VERSION（src/core/version.js）== package.json version（防版本漂移）；
+//      发布构建自动将 APP_BUILD 置为 "release"
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +21,8 @@ const dev = process.argv.includes("--dev");
 
 // ── 预期模块清单（顺序即加载顺序，须与 index.html 标签顺序逐项一致） ──
 const EXPECTED_JS = [
+  // core：版本信息（无依赖，须最先）
+  "src/core/version.js",
   // core：基础层
   "src/core/utils.js",
   // data：词库数据
@@ -39,6 +43,8 @@ const EXPECTED_JS = [
   "src/screens/achievements.js",
   "src/screens/home.js",
   "src/screens/mode-select.js",
+  // screens：关于
+  "src/screens/about.js",
   // net：P2P 联机
   "src/net/p2p.js",
   // game：对局核心 + 模式
@@ -123,7 +129,23 @@ validate("CSS", cssRefs, EXPECTED_CSS, ".css");
 const rawJs = jsRefs.map((f) => readFileSync(join(root, f), "utf8")).join("");
 const rawCss = cssRefs.map((f) => readFileSync(join(root, f), "utf8")).join("");
 
-let jsCode = rawJs;
+// ── 2.5 版本一致性校验 + 构建模式标记 ──
+// APP_VERSION（src/core/version.js）必须与 package.json version 一致，防文档/代码版本漂移
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const verMatch = rawJs.match(/const APP_VERSION = "([^"]+)"/);
+if (!verMatch) fail("未找到 APP_VERSION 定义（应在 src/core/version.js）");
+if (verMatch[1] !== pkg.version) {
+  fail(
+    `版本不一致：package.json 为 v${pkg.version}，src/core/version.js 的 APP_VERSION 为 v${verMatch[1]}——请同步后重新构建`
+  );
+}
+// 发布构建把 APP_BUILD 标记为 release（开发模式保持 dev，关于弹窗据此展示构建模式）
+const buildJs = dev
+  ? rawJs
+  : rawJs.replace(/const APP_BUILD = "dev";/, 'const APP_BUILD = "release";');
+if (!dev && buildJs === rawJs) fail('未找到 APP_BUILD = "dev" 标记（src/core/version.js）');
+
+let jsCode = buildJs;
 let cssCode = rawCss;
 
 if (!dev) {
@@ -137,7 +159,7 @@ if (!dev) {
 
   // 4. JS 压缩 + 混淆（mangle 局部变量/函数名；toplevel:false 保留顶层函数名，
   //    index.html 内联 onclick 依赖 go/openMode 等全局函数，混淆会使其失效）
-  const js = await minify(rawJs, {
+  const js = await minify(buildJs, {
     compress: true,
     mangle: { toplevel: false },
     format: { comments: false },

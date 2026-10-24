@@ -2016,6 +2016,30 @@ footer {
   border-top: 1.5px dashed var(--line);
   line-height: 1.8;
 }
+/* 页脚版本徽标：弱化小药丸，点击弹出关于 */
+footer .ver {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 1px 9px;
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: var(--sub);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  cursor: pointer;
+  opacity: 0.75;
+  vertical-align: middle;
+  user-select: none;
+  transition:
+    opacity 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+}
+footer .ver:hover {
+  opacity: 1;
+  color: var(--c-y);
+  border-color: var(--c-y);
+}
 .p2p-status {
   display: inline-flex;
   align-items: center;
