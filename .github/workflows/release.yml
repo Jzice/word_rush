@@ -1,0 +1,81 @@
+# 版本发布：推送 v* 标签（如 v1.0.0）时自动完成两件事
+#   1. 创建 GitHub Release（自动生成 Release Notes，附带单文件离线版 word_rush_<tag>.html）
+#   2. 构建并自动部署到 GitHub Pages
+# 发布新版本流程：
+#   git tag -a v1.1.0 -m "..." && git push origin v1.1.0
+# 注意：标签必须指向"包含本工作流文件"的提交，否则不会触发。
+
+name: Release & Deploy
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # 创建 Release
+  pages: write # 部署 Pages
+  id-token: write # Pages 部署 OIDC 鉴权
+
+concurrency:
+  group: pages
+  cancel-in-progress: false # 发布部署不取消，与 deploy.yml 共用一个队列
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm ci
+
+      - name: 构建单文件（压缩+内联）
+        run: npm run build
+
+      - name: 组装产物（Pages 目录 + Release 附件）
+        run: |
+          mkdir -p dist
+          cp -r vocab dist/vocab
+          mv dist/word_rush.html dist/index.html
+          # Release 附件：单文件离线版，带版本号命名（需联网加载字体与 PeerJS）
+          cp dist/index.html "word_rush_${GITHUB_REF_NAME}.html"
+
+      - name: 上传 Pages 构件
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: 上传 Release 附件构件
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asset-${GITHUB_REF_NAME}
+          path: word_rush_*.html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载 Release 附件
+        uses: actions/download-artifact@v4
+        with:
+          name: release-asset-${GITHUB_REF_NAME}
+          path: release-asset
+
+      - name: 创建 GitHub Release（自动生成 Notes + 附加单文件）
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-asset/word_rush_*.html
