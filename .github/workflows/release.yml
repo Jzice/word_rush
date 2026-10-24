@@ -61,12 +61,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # Pages 同一环境不允许并发部署：与 deploy.yml（分支推送）共用 pages 并发组，
-      # 但上个 run 结束后其部署可能仍在收尾，直接部署会瞬时失败（无步骤即失败）。
-      # 这里等待 45 秒错开收尾窗口；若仍偶发失败，在 Actions 页 Re-run failed jobs 即可。
-      - name: 等待既有部署收尾（规避 Pages 并发部署冲突）
-        run: sleep 45
-
+      # 注意：github-pages 环境需在 Settings → Environments 中允许标签部署
+      # （Deployment branches and tags 选 "Selected branches and tags" 并添加 v* 模式），
+      # 否则标签触发的本作业会在启动阶段被拒绝（无步骤即失败）。
       - id: deployment
         uses: actions/deploy-pages@v4
 
