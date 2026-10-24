@@ -3,6 +3,12 @@
 本项目所有重要变更均记录于此文件。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.3.0]
+
+### 新增
+
+- 🛠 **版本号一键同步**：新增 `npm run bump <版本>` 脚本，一条命令同步 `package.json`、`src/core/version.js` 并将 CHANGELOG 的 `[未发布]` 正名为新版本号；发版流程简化为 bump → commit → tag → push（构建时仍校验两处版本一致，作为兜底）。
+
 ## [1.2.0]
 
 ### 新增

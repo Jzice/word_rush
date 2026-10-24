@@ -55,11 +55,12 @@ npm run build
 - `release.yml` — 推送 `v*` 标签时，自动完成版本发布 + 部署 Pages：
 
   ```bash
-  git tag -a v1.1.0 -m "版本说明"
-  git push origin v1.1.0
+  npm run bump 1.2.0 # 一条命令同步 package.json + src/core/version.js + CHANGELOG 标题
+  git tag -a v1.2.0 -m "版本说明"
+  git push origin v1.2.0
   ```
 
-  自动执行：构建单文件 → 创建 GitHub Release（自动生成 Release Notes，附带 `word_rush_v1.1.0.html` 单文件附件）→ 部署 Pages。
+  自动执行：构建单文件 → 创建 GitHub Release（自动生成 Release Notes，附带 `word_rush_v1.2.0.html` 单文件附件）→ 部署 Pages。
 
 > 前提：仓库 Settings → Pages 的 Source 选 `GitHub Actions`，且 `github-pages` 环境的 Deployment branches and tags 需包含 `v*` 标签模式（否则标签部署会被环境规则拦截）。
 
