@@ -51,18 +51,19 @@ npm run build
 
 仓库内置两个工作流（`.github/workflows/`），推送即触发，无需手动操作：
 
-- `deploy.yml` — 推送 `master` / `main` 分支时，自动构建并部署到 [GitHub Pages](https://jzice.github.io/word_rush/)
-- `release.yml` — 推送 `v*` 标签时，自动完成版本发布 + 部署 Pages：
+- `deploy.yml` — 推送 `master` / `main` 分支时，自动构建并部署到 [GitHub Pages](https://jzice.github.io/word_rush/)（Actions 页面也可手动触发）
+- `release.yml` — 推送 `v*` 标签时，创建 GitHub Release 并附带单文件离线版：
 
   ```bash
-  npm run bump 1.2.0 # 一条命令同步 package.json + src/core/version.js + CHANGELOG 标题
-  git tag -a v1.2.0 -m "版本说明"
-  git push origin v1.2.0
+  npm run bump 1.3.0 # 一条命令同步 package.json + src/core/version.js + CHANGELOG 标题
+  git tag -a v1.3.0 -m "版本说明"
+  git push origin v1.3.0
   ```
 
-  自动执行：构建单文件 → 创建 GitHub Release（自动生成 Release Notes，附带 `word_rush_v1.2.0.html` 单文件附件）→ 部署 Pages。
+  自动执行：构建单文件 → 创建 GitHub Release（自动生成 Release Notes，附带 `word_rush_v1.3.0.html` 单文件附件）。
 
-> 前提：仓库 Settings → Pages 的 Source 选 `GitHub Actions`，且 `github-pages` 环境的 Deployment branches and tags 需包含 `v*` 标签模式（否则标签部署会被环境规则拦截）。
+> 说明：部署只由 `deploy.yml` 负责（推分支即部署），标签不再触发部署——同一提交不会重复部署，也无需为 `github-pages` 环境额外放行 `v*` 标签。
+> 前提：仓库 Settings → Pages 的 Source 选 `GitHub Actions`。
 
 ### 📚 添加自定义词库
 

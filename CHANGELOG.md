@@ -9,6 +9,12 @@
 
 - 🛠 **版本号一键同步**：新增 `npm run bump <版本>` 脚本，一条命令同步 `package.json`、`src/core/version.js` 并将 CHANGELOG 的 `[未发布]` 正名为新版本号；发版流程简化为 bump → commit → tag → push（构建时仍校验两处版本一致，作为兜底）。
 
+## [1.3.1]
+
+### 变更
+
+- ⚙️ **简化发布工作流**：`release.yml` 不再部署 GitHub Pages，改为只负责创建 Release 与单文件离线版附件；部署统一交给 `deploy.yml`（推送 master / 手动触发）。同一提交不再重复部署，避免 `github-pages` 环境的标签规则拦截与两个工作流并发部署冲突。
+
 ## [1.2.0]
 
 ### 新增
