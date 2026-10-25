@@ -55,10 +55,11 @@
                 </div>
                 <span class="tag" id="heroTag"></span>
               </div>
-              <div class="user-mood" id="userMood" title="点击编辑心情" onclick="openProfileModal()"></div>
+              <div class="user-mood" id="userMood" title="点击编辑心情" data-act="openProfileModal"></div>
               <div
                 id="todayStats"
-                onclick="go('scr-stats')"
+                data-act="go"
+                data-args='["scr-stats"]'
                 title="点击查看详细学习数据与学习曲线"
                 style="
                   font-size: 0.8rem;
@@ -116,10 +117,10 @@
               <button class="btn solid" id="btnDynStart" style="display: none">
                 ▶ 开始今日练习
               </button>
-              <button class="btn b sm" onclick="showShareModal()">
+              <button class="btn b sm" data-act="showShareModal">
                 📤 分享挑战
               </button>
-              <button class="btn c sm" onclick="showAchievementModal()">
+              <button class="btn c sm" data-act="showAchievementModal">
                 🏆 成就榜
               </button>
             </div>
@@ -153,7 +154,7 @@
                   <button
                     class="btn sm"
                     style="border-color: var(--c-p); color: var(--c-p)"
-                    onclick="showWrongList()"
+                    data-act="showWrongList"
                   >
                     📖 查看错题
                   </button>
@@ -165,7 +166,7 @@
             <button
               class="mode"
               style="--mc: #ff8fb3"
-              onclick="openMode('memory')"
+              data-act="openMode" data-args='["memory"]'
             >
               <span class="ic">🌸</span
               ><span
@@ -176,7 +177,7 @@
             <button
               class="mode"
               style="--mc: var(--c-c)"
-              onclick="openMode('time')"
+              data-act="openMode" data-args='["time"]'
             >
               <span class="ic">⏱️</span
               ><span
@@ -187,7 +188,7 @@
             <button
               class="mode"
               style="--mc: var(--c-p)"
-              onclick="openMode('fall')"
+              data-act="openMode" data-args='["fall"]'
             >
               <span class="ic">☄️</span
               ><span
@@ -198,7 +199,7 @@
             <button
               class="mode"
               style="--mc: var(--c-y)"
-              onclick="openMode('battle')"
+              data-act="openMode" data-args='["battle"]'
             >
               <span class="ic">⚔️</span>
               <span>
@@ -209,7 +210,7 @@
             <button
               class="mode"
               style="--mc: #7c4dff;"
-              onclick="openP2PMode()"
+              data-act="openP2PMode"
             >
               <span class="ic">🌐</span>
               <span>
@@ -220,7 +221,7 @@
             <button
               class="mode"
               style="--mc: var(--ok)"
-              onclick="go('scr-table')"
+              data-act="go" data-args='["scr-table"]'
             >
               <span class="ic">📋</span
               ><span
@@ -232,7 +233,7 @@
               <button
                 class="mode"
                 style="--mc: var(--c-b)"
-                onclick="go('scr-book')"
+                data-act="go" data-args='["scr-book"]'
               >
                 <span class="ic">📖</span
                 ><span
@@ -243,7 +244,7 @@
               <button
                 class="mode"
                 style="--mc: var(--c-y)"
-                onclick="go('scr-stats')"
+                data-act="go" data-args='["scr-stats"]'
               >
                 <span class="ic">📊</span
                 ><span
@@ -254,7 +255,7 @@
               <button
                 class="mode"
                 style="--mc: var(--c-p)"
-                onclick="go('scr-shop')"
+                data-act="go" data-args='["scr-shop"]'
               >
                 <span class="ic">🛒</span
                 ><span
@@ -273,7 +274,7 @@
       </section>
 
       <section id="scr-book" class="scr">
-        <button class="back" onclick="go('scr-home')">← 返回主页</button>
+        <button class="back" data-act="go" data-args='["scr-home"]'>← 返回主页</button>
         <h2 class="sec">📖 单词本 · 按单元浏览</h2>
         <div class="toolbar">
           <input
@@ -295,7 +296,7 @@
       </section>
 
       <section id="scr-table" class="scr">
-        <button class="back" onclick="go('scr-home')">← 返回主页</button>
+        <button class="back" data-act="go" data-args='["scr-home"]'>← 返回主页</button>
         <h2 class="sec">📋 单词表 · 单元学习情况与统计</h2>
         <div class="tstats" id="tStats"></div>
         <div class="toolbar">
@@ -319,7 +320,7 @@
       </section>
 
       <section id="scr-shop" class="scr">
-        <button class="back" onclick="go('scr-home')">← 返回主页</button>
+        <button class="back" data-act="go" data-args='["scr-home"]'>← 返回主页</button>
         <h2 class="sec">🎨 黑板主题</h2>
         <div class="thgrid" id="thGrid"></div>
         <h2 class="sec">🎒 战斗道具</h2>
@@ -327,7 +328,7 @@
       </section>
 
       <section id="scr-stats" class="scr">
-        <button class="back" onclick="go('scr-home')">← 返回主页</button>
+        <button class="back" data-act="go" data-args='["scr-home"]'>← 返回主页</button>
         <h2 class="sec">📊 学习数据 · 我的成长曲线</h2>
         <div id="statsBody"></div>
       </section>
@@ -336,54 +337,16 @@
     <footer>
       词库：人教版（9册）· 外研版（新标准）· 新概念第一册 · KET · 四级 · 六级 ·
       持续扩充中
-      <span class="ver" id="verTag" onclick="showAbout()" title="关于 WORD RUSH"></span>
+      <span class="ver" id="verTag" data-act="showAbout" title="关于 WORD RUSH"></span>
     </footer>
     <div id="toasts"></div>
     <div id="fx"></div>
     <div class="modal hide" id="modal">
       <div class="mbox paper" id="mbox"></div>
     </div>
-    <!-- ═══ 模块脚本（经典脚本，按依赖序加载；顺序变更会破坏运行时语义） ═══ -->
-    <!-- core：版本信息（须最先，无依赖） -->
-    <script src="src/core/version.js"></script>
-    <!-- core：基础层 -->
-    <script src="src/core/utils.js"></script>
-    <!-- data：词库数据 -->
-    <script src="src/data/books.js"></script>
-    <script src="src/data/dynamic.js"></script>
-    <script src="src/data/index.js"></script>
-    <script src="src/data/phrases.js"></script>
-    <!-- core：存档 / 算法 / 统计 -->
-    <script src="src/core/store.js"></script>
-    <script src="src/core/srs.js"></script>
-    <script src="src/core/stats.js"></script>
-    <!-- ui：渲染 / 音频 / 外壳 / 特效 -->
-    <script src="src/ui/render.js"></script>
-    <script src="src/ui/audio.js"></script>
-    <script src="src/ui/shell.js"></script>
-    <script src="src/ui/fx.js"></script>
-    <!-- screens：成就 / 主页 / 模式设置 -->
-    <script src="src/screens/achievements.js"></script>
-    <script src="src/screens/home.js"></script>
-    <script src="src/screens/mode-select.js"></script>
-    <!-- screens：关于 -->
-    <script src="src/screens/about.js"></script>
-    <!-- net：P2P 联机 -->
-    <script src="src/net/p2p.js"></script>
-    <!-- game：对局核心 + 5 种模式 -->
-    <script src="src/game/core.js"></script>
-    <script src="src/game/mode-run.js"></script>
-    <script src="src/game/mode-mem.js"></script>
-    <script src="src/game/mode-fall.js"></script>
-    <script src="src/game/mode-battle.js"></script>
-    <!-- screens：结算 / 单词本 / 单词表 / 学习数据 / 商店 -->
-    <script src="src/screens/result.js"></script>
-    <script src="src/screens/book.js"></script>
-    <script src="src/screens/table.js"></script>
-    <script src="src/screens/stats.js"></script>
-    <script src="src/screens/shop.js"></script>
-    <!-- boot：启动序列（必须最后） -->
-    <script src="src/boot.js"></script>
+    <!-- ═══ ESM 入口：按依赖序 import 全部模块（含 net/p2p）；先执行以挂 window 桥接 ═══ -->
+    <script type="module" src="/src/main.ts"></script>
+    <!-- ═══ PeerJS（CDN 外链，联机对战需要运行时联网加载） ═══ -->
     <script defer src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   </body>
 </html>

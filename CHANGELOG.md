@@ -3,6 +3,22 @@
 本项目所有重要变更均记录于此文件。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.4.0]
+
+### 重构
+
+- 🧩 **迁移为 TypeScript ES 模块工程**：原先 29 个经典脚本（共享全局作用域）改为 29 个 `.ts` ES 模块，单一入口 `src/main.ts` 按原 `index.html` 脚本顺序 import，以 ESM 求值序等价保留原拼接执行序（含各文件顶层 IIFE 与 boot 启动序列）。
+  - **行为零变化**：词库数据、存档结构、视觉表现、单文件产物形态全部保持不变，仅替换工程形态（类型系统、模块化、构建管线、事件绑定方式）。
+  - `npm run dev` 改为 Vite dev server（TS 即时转换）；`npm run build` 改为 esbuild 打包 `main.ts` → 单 IIFE，terser 混淆（`mangle.toplevel:false`）+ clean-css + 版本一致性校验 + 孤儿文件检查全部保留，产物仍是内联经典脚本，`file://` 双击即玩不受影响。
+- 🎯 **事件绑定中央化**：90+ 处内联事件处理器（`index.html` 19 处 + JS 生成 HTML 71 处）迁移为 `data-act` 中央事件委托（`src/ui/events.ts` 注册表 + `dataAct()` 模板助手），全量删除内联 `onclick`。
+- 🔓 **拆除 window 桥接**：254 个 `expose`/`exposeGetter` 符号改为真实 ESM `export`/`import`，`data-act` 分发由 `window[name]` 回退改为 `registerAct` 显式注册；`G`/`S` 这类跨模块整体重新赋值的全局改用 `setG()` setter + `export let` 实时绑定；删除 `src/bridge.ts` 与 `global.d.ts` 的 ambient `any` 兜底，`tsc` 从此强制所有跨模块引用必须是真实 import。
+
+### 新增
+
+- 🧪 **测试从零到一**：新增 vitest 纯逻辑单测（SRS 算法、等级/统计、`P()` 词条解析、CSV 动态词库解析、store 序列化等）与模块导出冒烟，共 137 个用例；新增 `npm test`、`npm run typecheck` 脚本。
+- 🌐 **浏览器全流程冒烟**：新增 `npm run smoke`（Playwright + 真实 Chromium 加载 `dist/word_rush.html`），覆盖主页渲染、选词库/单元、开局 → 真实键盘打字 → 结算、商店、学习数据 Canvas、单词表/单词本、个人资料、成就、关于、P2P 共 20 项断言；且与桥接无关（真实点击 + DOM 断言），可作为重构回归基线。
+- 📐 **类型收紧**：`tsconfig` 终态开启 `strict: true` 与 `noImplicitAny: true`。
+
 ## [1.3.2]
 
 ### 新增

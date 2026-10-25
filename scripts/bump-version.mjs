@@ -17,7 +17,7 @@ if (!next) {
   process.exit(1);
 }
 
-const FILES = { pkg: "package.json", ver: "src/core/version.js", log: "CHANGELOG.md" };
+const FILES = { pkg: "package.json", ver: "src/core/version.ts", log: "CHANGELOG.md" };
 const read = (f) => readFileSync(join(root, f), "utf8");
 
 // 1. package.json：替换 version 字段（保留原格式）
