@@ -8,6 +8,15 @@ declare global {
     S: any;
     Peer: any;
   }
+  // Vite 注入的 import.meta.env（此处自声明，避免 tsconfig 的 types:[] 引入 vite/client）
+  interface ImportMetaEnv {
+    PROD: boolean;
+    DEV: boolean;
+    MODE: string;
+  }
+  interface ImportMeta {
+    env: ImportMetaEnv;
+  }
 }
 
 export {};

@@ -14,8 +14,8 @@ export const REPO_URL = "https://github.com/Jzice/word_rush";
 export const RELEASE_URL = REPO_URL + "/releases";
 export function showAbout() {
   const local = location.protocol === "file:";
-  // APP_BUILD 字面量类型是 "dev"（构建时会被替换为 "release"），故断言为 string 以保留运行期判断
-  const mode = (APP_BUILD as string) === "release" ? "正式构建" : "开发模式";
+  // APP_BUILD 由构建模式决定：生产构建为 "release"，其余（dev / build:dev）为 "dev"
+  const mode = APP_BUILD === "release" ? "正式构建" : "开发模式";
   const html = `<h3>ℹ️ 关于 WORD RUSH</h3><div class="sub">单词快打 · 多教材词汇特训</div><div style="text-align:center;margin:14px 0 6px"><div style="font-size:2rem;font-weight:900;font-family:Bungee,cursive;color:var(--c-y);letter-spacing:.05em">v${escHtml(
     APP_VERSION
   )}</div><div style="font-size:.72rem;color:var(--sub);margin-top:4px">${mode}${

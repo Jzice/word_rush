@@ -3,6 +3,16 @@
 本项目所有重要变更均记录于此文件。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.5.0]
+
+### 重构
+
+- ⚡ **生产构建全面切换为 Vite**：`npm run build` 由自研 `build.mjs`（esbuild 打包 + 手工内联）改为 `vite build`，`npm run build:dev` 改为 `vite build --mode development --minify false`；删除 `build.mjs` 与 `esbuild`/`clean-css` 依赖（CSS 压缩交给 Vite 内置）。
+  - 新增 `scripts/vite-plugin-singlefile.mjs` 承接收尾：把 IIFE chunk 与 CSS 内联进 HTML、改名输出 `dist/word_rush.html`，并保留原构建的三项 fail-fast 校验（版本一致性、孤儿文件、产物终检）。
+  - 插件会把 Vite 提升到 `<head>` 的入口脚本**回迁到 `</body>` 前**并内联为经典 `<script>`（非 `type="module"`），保证 `file://` 双击即玩语义不变。
+  - `APP_BUILD` 不再靠发布时正则替换，改由构建模式折叠：`import.meta.env.PROD ? "release" : "dev"`。
+  - 产物形态与行为零变化（单文件、无本地外链）；`npm run smoke` 20/20 通过。
+
 ## [1.4.0]
 
 ### 重构

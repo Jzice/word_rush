@@ -29,21 +29,20 @@
 
 ## 🚀 运行（开发模式）
 
-直接加载源文件，无需构建：
-
 ```
 npm run dev
 ```
 
-浏览器访问 http://localhost:3000 即可游玩。
+Vite 开发服务器（TS 即时转换 + HMR），浏览器访问 http://localhost:5173 即可游玩。
 
 ## 📦 构建发布
 
 ```
-npm run build
+npm run build        # 发布模式：压缩+混淆，产出单文件
+npm run build:dev    # 同产物但不压缩，便于调试
 ```
 
-输出单一 HTML 文件 `dist/word_rush.html`（CSS/JS 已内联，双击即玩）。
+Vite 以 `index.html` 为入口打包（唯一入口 `src/main.ts`），再由 `scripts/vite-plugin-singlefile.mjs` 把 JS/CSS 全部内联，输出单一 HTML 文件 `dist/word_rush.html`（双击即玩）。
 
 > 注意：构建产物中的自定义字体（Google Fonts）与联机对战（PeerJS）仍引用外部 CDN，离线环境下这两项不可用。
 
@@ -79,18 +78,20 @@ npm run build
 
 ## 🗂 项目结构
 
-- `index.html` — 页面结构，内置 onclick 调用全局函数； body 末端按依赖序加载 29 个模块脚本
-- `src/` — 全部游戏逻辑，按功能域拆分为经典脚本模块（共享全局作用域，非 ES Modules，故 `file://` 双击即玩不受影响）：
-  - `core/` — 工具与常量、存档、SRS 记忆算法、等级统计
+- `index.html` — 页面结构；交互统一走 `data-act` 事件委托，`<script type="module" src="/src/main.ts">` 为唯一入口
+- `src/` — 全部游戏逻辑（TypeScript ES 模块），按功能域拆分：
+  - `core/` — 工具与常量、存档、SRS 记忆算法、等级统计、版本号
   - `data/` — 词库数据：`books`（内置）、`dynamic`（动态词库/CSV/缓存）、`index`（全局词表）、`phrases`（短语库）
-  - `ui/` — 词卡渲染、音效与朗读、屏幕外壳（切屏/HUD/屏幕键盘）、反馈特效
-  - `screens/` — 成就、主页、模式设置、结算、单词本、单词表、学习数据、商店
+  - `ui/` — 事件委托、词卡渲染、音效与朗读、屏幕外壳（切屏/HUD/屏幕键盘）、反馈特效
+  - `screens/` — 成就、主页、模式设置、关于、结算、单词本、单词表、学习数据、商店
   - `game/` — 对局核心（`G`/输入路由/生命周期）+ 四种本地模式（闯关/记忆/陨石/对战）
   - `net/` — P2P 联机（单挑 + 多人房间）
-  - `boot.js` — 启动序列（必须最后加载）
-  - 新增模块需同步 `index.html` 标签序与 `build.mjs` 的 `EXPECTED_JS` 清单，否则构建报错
+  - `main.ts` — 唯一入口，按依赖序 import 全部模块；`boot.ts` — 启动序列（必须最后执行）
+  - 新增模块需在 `src/main.ts` 中 import（勿遗漏：构建会做孤儿文件检查）
 - `src/style.css` — 全部样式，主题通过 `body[data-theme]` + CSS 变量切换
-- `build.mjs` — 构建脚本：按清单顺序拼接 CSS/JS 并内联进 `dist/word_rush.html`（含引用一致性校验）
+- `vite.config.ts` — Vite 配置（dev server + 生产构建 + Vitest）
+- `scripts/vite-plugin-singlefile.mjs` — 单文件内联插件（含版本一致性、孤儿文件、产物终检）
+- `e2e/smoke.mjs` — Playwright 冒烟测试（以 `file://` 加载产物，真实点击/键盘验证）
 - `dist/` — 构建产物（已 gitignore）
 
 ## ⌨️ 操作提示
@@ -102,6 +103,11 @@ npm run build
 
 ## 🛠 技术说明
 
-纯 Vanilla JS + CSS；音效用 WebAudio 合成，单词朗读用浏览器 SpeechSynthesis，联机对战用 PeerJS。代码内注释为简体中文。
+TypeScript（严格模式）+ 原生 CSS，无前端框架；开发/构建用 Vite（生产构建走 terser 压缩混淆，产物内联为单文件）。
+音效用 WebAudio 合成，单词朗读用浏览器 SpeechSynthesis，联机对战用 PeerJS。代码内注释为简体中文。
 
-（暂无自动化测试；改动后用 `npm run build` + 浏览器实测验证。）
+```bash
+npm run typecheck   # tsc --noEmit
+npm test            # Vitest 单元测试
+npm run smoke       # 构建 + Playwright 浏览器冒烟测试（file:// 加载产物）
+```
