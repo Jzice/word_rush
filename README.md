@@ -62,6 +62,8 @@ npm run build
 
   自动执行：构建单文件 → 创建 GitHub Release（自动生成 Release Notes，附带 `word_rush_v1.3.0.html` 单文件附件）。
 
+  也可在 Actions 页面手动运行 `Release` 工作流（输入版本号，如 `1.3.1`）补建/重跑某个版本的 Release——无需删除重推标签，且会检出对应标签的提交，保证附件是该版本的真实产物。
+
 > 说明：部署只由 `deploy.yml` 负责（推分支即部署），标签不再触发部署——同一提交不会重复部署，也无需为 `github-pages` 环境额外放行 `v*` 标签。
 > 前提：仓库 Settings → Pages 的 Source 选 `GitHub Actions`。
 

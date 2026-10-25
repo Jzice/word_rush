@@ -1,16 +1,24 @@
 # 版本发布：推送 v* 标签（如 v1.3.0）时创建 GitHub Release，并附带单文件离线版。
+# 也支持在 Actions 页面「Run workflow」手动运行（输入版本号，如 1.3.1，可带或不带 v 前缀），
+# 用于补建/重跑某个版本的 Release——无需删除重推标签。
 # 部署到 GitHub Pages 由 deploy.yml 负责（推送 master / main 或 Actions 页面手动触发），
 # 本工作流不再部署——同一提交只部署一次，既避开 github-pages 环境对标签的部署限制，
 # 也消除两个工作流并发部署 Pages 的冲突（历史上曾因此加过 sleep 保护）。
 # 发布新版本流程：
 #   npm run bump 1.3.0 → commit → git tag -a v1.3.0 -m "..." → git push origin master && git push origin v1.3.0
-# 注意：标签必须指向"包含本工作流文件"的提交，否则不会触发。
+# 注意：标签必须指向"包含本工作流文件"的提交，否则标签推送不会触发。
 
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "版本号（如 1.3.1，可带或不带 v 前缀）"
+        required: true
+        type: string
 
 permissions:
   contents: write # 创建 Release 与上传附件
@@ -18,8 +26,22 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
+      # 统一发布标签名：标签推送取 github.ref_name；手动运行取输入，统一规范为 v 前缀
+      - id: tag
+        name: 计算发布标签名
+        run: |
+          RAW="${{ github.event.inputs.tag || github.ref_name }}"
+          RAW="${RAW#v}"
+          echo "tag=v${RAW}" >> "$GITHUB_OUTPUT"
+          echo "发布标签：v${RAW}"
+
+      # 手动运行时检出对应标签的提交，保证附件是该版本的真实产物
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
@@ -31,12 +53,12 @@ jobs:
         run: npm run build
 
       - name: 组装 Release 附件（单文件离线版，带版本号命名）
-        run: cp dist/word_rush.html "word_rush_${GITHUB_REF_NAME}.html"
+        run: cp dist/word_rush.html "word_rush_${{ steps.tag.outputs.tag }}.html"
 
       - name: 上传 Release 附件构件
         uses: actions/upload-artifact@v4
         with:
-          name: release-asset-${GITHUB_REF_NAME}
+          name: release-asset-${{ steps.tag.outputs.tag }}
           path: word_rush_*.html
 
   release:
@@ -46,11 +68,12 @@ jobs:
       - name: 下载 Release 附件
         uses: actions/download-artifact@v4
         with:
-          name: release-asset-${GITHUB_REF_NAME}
+          name: release-asset-${{ needs.build.outputs.tag }}
           path: release-asset
 
       - name: 创建 GitHub Release（自动生成 Notes + 附加单文件）
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          tag_name: ${{ needs.build.outputs.tag }}
           files: release-asset/word_rush_*.html

@@ -3,6 +3,12 @@
 本项目所有重要变更均记录于此文件。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [未发布]
+
+### 新增
+
+- ⚙️ **Release 工作流支持手动触发**：`release.yml` 增加 `workflow_dispatch`，可在 Actions 页面输入版本号（如 `1.3.1`）补建/重跑某个版本的 GitHub Release（含单文件附件），无需删除重推标签；手动运行会检出对应标签的提交，保证附件是该版本的真实产物。
+
 ## [1.3.0]
 
 ### 新增
