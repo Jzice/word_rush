@@ -3,7 +3,7 @@
 本项目所有重要变更均记录于此文件。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [未发布]
+## [1.3.2]
 
 ### 新增
 
