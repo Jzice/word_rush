@@ -2635,3 +2635,73 @@ footer .ver:hover {
   margin-left: auto;
   text-align: right;
 }
+
+/* ================= 自然拼读着色（仅 body.phonics-on 时生效） =================
+ * 默认关闭（opt-in）。开启后逐字母用固定色标出拼读规律，
+ * 音节边界用左间距(syl-b)细分隔；输入状态(ok/err/mok)改用背景底色，
+ * 文本色始终留给 phonics，互不覆盖。
+ * ==================================================================== */
+body.phonics-on {
+  --ph-vowel: #4ea1ff;
+  --ph-vteam: #ff6fae;
+  --ph-rctl: #ffb347;
+  --ph-digraph: #2fd0bd;
+  --ph-blend: #b08bff;
+  --ph-silent: #9aa6b2;
+  --ph-cons: inherit;
+}
+/* 浅色主题下提高对比度 */
+body[data-theme="paper"].phonics-on {
+  --ph-vowel: #1f6fd6;
+  --ph-vteam: #d63384;
+  --ph-rctl: #b9721a;
+  --ph-digraph: #0e8c7e;
+  --ph-blend: #6f3fd6;
+  --ph-silent: #7a8794;
+  --ph-cons: inherit;
+}
+/* —— 通用词区域（限时/每日/闯关/复习/对战） —— */
+body.phonics-on .wordbox .l.ph-vowel { color: var(--ph-vowel); }
+body.phonics-on .wordbox .l.ph-vteam { color: var(--ph-vteam); }
+body.phonics-on .wordbox .l.ph-rctl { color: var(--ph-rctl); }
+body.phonics-on .wordbox .l.ph-digraph { color: var(--ph-digraph); }
+body.phonics-on .wordbox .l.ph-blend { color: var(--ph-blend); }
+body.phonics-on .wordbox .l.ph-silent { color: var(--ph-silent); text-decoration: line-through; opacity: .7; }
+body.phonics-on .wordbox .l.ph-cons { color: var(--ph-cons); }
+body.phonics-on .wordbox .l.syl-b { margin-left: .18em; }
+/* 状态反馈改背景，文本色留给 phonics */
+body.phonics-on .wordbox .l.ok { background: color-mix(in srgb, var(--ok) 24%, transparent); border-radius: 6px; text-shadow: none; }
+body.phonics-on .wordbox .l.err { background: color-mix(in srgb, var(--bad) 34%, transparent); border-radius: 6px; text-shadow: none; }
+/* —— 花瓣记忆 —— */
+body.phonics-on .fword .fl.ph-vowel { color: var(--ph-vowel); }
+body.phonics-on .fword .fl.ph-vteam { color: var(--ph-vteam); }
+body.phonics-on .fword .fl.ph-rctl { color: var(--ph-rctl); }
+body.phonics-on .fword .fl.ph-digraph { color: var(--ph-digraph); }
+body.phonics-on .fword .fl.ph-blend { color: var(--ph-blend); }
+body.phonics-on .fword .fl.ph-silent { color: var(--ph-silent); text-decoration: line-through; opacity: .8; }
+body.phonics-on .fword .fl.ph-cons { color: var(--ph-cons); }
+body.phonics-on .fword .fl.syl-b { margin-left: .18em; }
+/* 已拼写正确的字母给底色指示，文本仍用 phonics 色 */
+body.phonics-on .fword .fl.mok { background: color-mix(in srgb, var(--ok) 22%, transparent); border-radius: 8px; }
+/* 逐字母聚焦高亮优先（show 阶段） */
+body.phonics-on .fword .fl.focus { color: #ffe14d; }
+/* —— 陨石单词 —— */
+body.phonics-on .fword-f .ph-vowel { color: var(--ph-vowel); }
+body.phonics-on .fword-f .ph-vteam { color: var(--ph-vteam); }
+body.phonics-on .fword-f .ph-rctl { color: var(--ph-rctl); }
+body.phonics-on .fword-f .ph-digraph { color: var(--ph-digraph); }
+body.phonics-on .fword-f .ph-blend { color: var(--ph-blend); }
+body.phonics-on .fword-f .ph-silent { color: var(--ph-silent); text-decoration: line-through; opacity: .8; }
+body.phonics-on .fword-f .ph-cons { color: var(--ph-cons); }
+body.phonics-on .fword-f .syl-b { margin-left: .14em; }
+body.phonics-on .fword-f .ok { background: color-mix(in srgb, var(--ok) 28%, transparent); border-radius: 6px; }
+/* —— 陨石输入行 —— */
+body.phonics-on #fallInput .ph-vowel { color: var(--ph-vowel); }
+body.phonics-on #fallInput .ph-vteam { color: var(--ph-vteam); }
+body.phonics-on #fallInput .ph-rctl { color: var(--ph-rctl); }
+body.phonics-on #fallInput .ph-digraph { color: var(--ph-digraph); }
+body.phonics-on #fallInput .ph-blend { color: var(--ph-blend); }
+body.phonics-on #fallInput .ph-silent { color: var(--ph-silent); text-decoration: line-through; opacity: .8; }
+body.phonics-on #fallInput .ph-cons { color: var(--ph-cons); }
+body.phonics-on #fallInput .syl-b { margin-left: .14em; }
+body.phonics-on #fallInput .ok { background: color-mix(in srgb, var(--ok) 28%, transparent); border-radius: 6px; }

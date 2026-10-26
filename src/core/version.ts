@@ -8,7 +8,7 @@
  *       APP_BUILD 由构建模式决定：生产构建（npm run build）为 "release"，
  *       其余（npm run dev / build:dev / vitest）为 "dev"，勿手改。
  * ==================================================================== */
-export const APP_VERSION = "1.5.0";
+export const APP_VERSION = "1.6.0";
 // import.meta.env.PROD 由 Vite 在构建期折叠为常量（vite.config.ts 亦显式 define）
 export const APP_BUILD: string = import.meta.env.PROD ? "release" : "dev";
 

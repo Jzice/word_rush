@@ -1,6 +1,7 @@
 import { markWord } from "../core/srs";
 import { updateDailyStats } from "../core/stats";
 import { S, save } from "../core/store";
+import { tagWord } from "../core/phonics";
 import { escHtml, pick, rnd, same, shuffle, sleep, vib, wFont, $ } from "../core/utils";
 import { ALL } from "../data/index";
 import { G, setG, countdown, endGameCleanup, hudHTML, routeChar } from "./core";
@@ -107,16 +108,18 @@ export const setMsg = (t: any) => {
 };
 export function memPaint() {
   const it = cur();
+  const tg = S.set.phonics ? tagWord(it.en) : null;
+  const ph = (i: any) => (tg && it.en[i] !== " " ? " " + tg[i].cls : "");
   $("#memWord").innerHTML = [...it.en]
     .map((ch: any, i: any) => {
       const c = ch === " " ? "&nbsp;" : escHtml(ch);
       if (G.phase === "show")
-        return `<span class="fl ${i === G.focus ? "focus" : ""}">${c}</span>`;
+        return `<span class="fl ${i === G.focus ? "focus" : ""}${ph(i)}">${c}</span>`;
       if (G.phase === "hide")
         return i < G.typed
-          ? `<span class="fl mok">${c}</span>`
+          ? `<span class="fl mok${ph(i)}">${c}</span>`
           : `<span class="fl hid" id="ms${i}">?</span>`;
-      return `<span class="fl ${G.errsPos[i] ? "warn" : "mok"}">${c}</span>`;
+      return `<span class="fl ${G.errsPos[i] ? "warn" : "mok"}${ph(i)}">${c}</span>`;
     })
     .join("");
 }

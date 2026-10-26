@@ -34,7 +34,7 @@ export function def() {
       roomRounds: 0,
       roomWins: 0,
     },
-    set: { sound: true, tts: true, osk: "auto", wordOrder: "random" },
+    set: { sound: true, tts: true, osk: "auto", wordOrder: "random", phonics: false },
     profile: {
       name: "",
       gender: "保密",
@@ -52,7 +52,7 @@ try {
   S.items = Object.assign({ hint: 1, time: 0, shield: 0 }, S.items);
   S.stats = Object.assign(def().stats, S.stats);
   S.set = Object.assign(
-    { sound: true, tts: true, osk: "auto", wordOrder: "random" },
+    { sound: true, tts: true, osk: "auto", wordOrder: "random", phonics: false },
     S.set
   );
   S.profile = Object.assign(

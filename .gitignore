@@ -6,3 +6,4 @@ node_modules
 .playwright-mcp
 .playwright-cli
 serve.log
+.codebuddy/

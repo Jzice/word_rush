@@ -2,8 +2,9 @@ import { registerAct } from "./events";
 import { lvl, titleOf } from "../core/stats";
 import { S, save } from "../core/store";
 import { escHtml, $, $$ } from "../core/utils";
-import { G, routeChar } from "../game/core";
-import { cur } from "../game/mode-mem";
+import { G, routeChar, paintWord } from "../game/core";
+import { cur, memPaint } from "../game/mode-mem";
+import { paintFall, paintFallInput } from "../game/mode-fall";
 import { renderBook } from "../screens/book";
 import { renderHome } from "../screens/home";
 import { renderShop } from "../screens/shop";
@@ -27,6 +28,9 @@ export function refreshHead() {
   $("#btnSound").classList.toggle("off", !S.set.sound);
   $("#btnTts").classList.toggle("off", !S.set.tts);
   $("#btnOsk").classList.toggle("off", (S.set.osk || "auto") === "off");
+  $("#btnPhonics").classList.toggle("off", !S.set.phonics);
+  $("#btnPhonics").textContent = S.set.phonics ? "🔤" : "🔡";
+  document.body.classList.toggle("phonics-on", !!S.set.phonics);
   $("#btnSound").textContent = S.set.sound ? "🔔" : "🔕";
   $("#btnTts").textContent = S.set.tts ? "🔊" : "🔇";
   // 顶部用户卡片：头像 + 用户名
@@ -85,6 +89,26 @@ $("#btnOsk").onclick = () => {
       { auto: "自动（触屏设备显示）", on: "强制开启", off: "关闭" }[next]
   );
 };
+/* 自然拼读着色开关：即时重绘当前对局单词 */
+$("#btnPhonics").onclick = () => {
+  S.set.phonics = !S.set.phonics;
+  save();
+  refreshHead();
+  repaintPhonics();
+  toast("🔤 自然拼读着色：" + (S.set.phonics ? "已开启" : "已关闭"));
+};
+export function repaintPhonics() {
+  if (!G || !G.active) return;
+  if (G.type === "run" || G.type === "battle") {
+    const it = G.queue && G.queue[G.idx];
+    if (it && $("#wordBox")) paintWord($("#wordBox"), it.en, G.typed);
+  } else if (G.type === "mem") {
+    memPaint();
+  } else if (G.type === "fall") {
+    if (G.words) G.words.forEach((w: any) => paintFall(w));
+    paintFallInput();
+  }
+}
 
 export function buildOsk() {
   const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];

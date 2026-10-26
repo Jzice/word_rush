@@ -1,4 +1,5 @@
 import { dataAct, $ } from "../core/utils";
+import { tagWord } from "../core/phonics";
 import { registerAct } from "../ui/events";
 import { S, save } from "../core/store";
 import { escHtml, sleep } from "../core/utils";
@@ -194,11 +195,17 @@ export function useShield() {
   sShield();
 }
 export function paintWord(el: any, word: any, typed: any, err?: any) {
+  const tg = S.set.phonics ? tagWord(word) : null;
   el.innerHTML = [...word]
     .map((ch: any, i: any) => {
       const c = ch === " " ? "&nbsp;" : escHtml(ch);
+      const ph = tg && ch !== " " ? " " + tg[i].cls : "";
       let cls =
-        i < typed ? "l ok" : i === typed ? "l cur" + (err ? " err" : "") : "l";
+        i < typed
+          ? "l ok" + ph
+          : i === typed
+          ? "l cur" + (err ? " err" : "") + ph
+          : "l" + ph;
       return `<span class="${cls}">${c}</span>`;
     })
     .join("");

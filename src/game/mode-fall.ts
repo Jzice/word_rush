@@ -2,6 +2,7 @@ import { markWord } from "../core/srs";
 import { updateDailyStats } from "../core/stats";
 import { S, save } from "../core/store";
 import { clamp, escHtml, pick, rnd, same, shuffle, vib, $ } from "../core/utils";
+import { tagWord } from "../core/phonics";
 import { ALL } from "../data/index";
 import { G, setG, countdown, endGameCleanup, hudHTML, itemBtns, refreshItems, routeChar } from "./core";
 import { showResult } from "../screens/result";
@@ -101,9 +102,13 @@ export function spawnFall() {
   G.words.push({ it, el, y: -44, matched: 0, errs: 0, t: Date.now() });
 }
 export function paintFall(w: any) {
+  const tg = S.set.phonics ? tagWord(w.it.en) : null;
+  const ph = (i: any) => (tg && w.it.en[i] !== " " ? " " + tg[i].cls : "");
   w.el.innerHTML = [...w.it.en]
     .map((c: any, i: any) =>
-      i < w.matched ? `<span class="ok">${c}</span>` : escHtml(c)
+      i < w.matched
+        ? `<span class="ok${ph(i)}">${c}</span>`
+        : `<span class="${ph(i).trim()}">${c}</span>`
     )
     .join("");
 }
@@ -136,10 +141,16 @@ export function paintFallInput() {
     return;
   }
   const w = G.target;
+  const tg = S.set.phonics ? tagWord(w.it.en) : null;
+  const ph = (k: any) => (tg && w.it.en[k] !== " " ? " " + tg[k].cls : "");
   i.innerHTML = [...w.it.en]
-    .map((c: any, k: any) =>
-      k < w.matched ? `<span style="color:var(--ok)">${c}</span>` : c
-    )
+    .map((c: any, k: any) => {
+      if (k < w.matched) {
+        const st = S.set.phonics ? "" : ' style="color:var(--ok)"';
+        return `<span class="ok${ph(k)}"${st}>${c}</span>`;
+      }
+      return `<span class="${ph(k).trim()}">${c}</span>`;
+    })
     .join("");
 }
 export function fallMiss() {
