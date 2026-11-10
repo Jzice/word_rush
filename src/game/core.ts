@@ -8,7 +8,7 @@ import { onBattleChar } from "./mode-battle";
 import { onFallChar } from "./mode-fall";
 import { cur, onMemChar } from "./mode-mem";
 import { goodChar, onRunChar } from "./mode-run";
-import { isHost, onP2PChar, p2pHostDisband, p2pLeave } from "../net/p2p";
+import { isHost, onP2PChar, p2pConfirmLeave, p2pExitRoom, p2pHandleEsc, p2pInRoom } from "../net/p2p";
 import { clickLv, closeModal, modalOpen, openModal } from "../screens/home";
 import { beep, sShield, speak } from "../ui/audio";
 import { burst, floaty, toast } from "../ui/fx";
@@ -95,21 +95,35 @@ export function routeChar(ch: any) {
 }
 
 export function handleEsc() {
+  // 一局结束后的 P2P：Esc/✕ 不隐式退回主页，改为二次确认；取消时回到原弹窗或大厅
+  const inP2PRoom =
+    $("#scr-game").classList.contains("on") &&
+    p2pInRoom() &&
+    (!G || (G.type === "p2p" && !G.active));
   if (modalOpen) {
-    closeModal();
+    if (inP2PRoom) p2pHandleEsc();
+    else closeModal();
     return;
   }
   if (G && G.active) {
+    const isP2P = G.type === "p2p";
     openModal(
-      `<h3>PAUSE</h3><div class="sub">确定退出本局吗？当前进度不会保存。</div><div class="mbtns"><button class="btn c" ${dataAct('closeModal')}>继续战斗</button><button class="btn p" ${dataAct('quitGame')}>退出</button></div>`
+      `<h3>PAUSE</h3><div class="sub">${
+        isP2P
+          ? `退出本局将同时离开联机房间${isHost ? "（房主退出会解散房间）" : ""}，当前进度不会保存。`
+          : "确定退出本局吗？当前进度不会保存。"
+      }</div><div class="mbtns"><button class="btn c" ${dataAct('closeModal')}>继续战斗</button><button class="btn p" ${dataAct('quitGame')}>${isP2P ? "退出并离开房间" : "退出"}</button></div>`
     );
-  } else if ($("#scr-game").classList.contains("on")) go("scr-home");
+  } else if ($("#scr-game").classList.contains("on")) {
+    // 回主页需二次确认：确认后退出并结算，取消则继续留在房间
+    if (p2pInRoom()) p2pConfirmLeave();
+    else go("scr-home");
+  }
 }
 export function quitGame() {
   closeModal();
   if (G && G.type === "p2p") {
-    if (isHost) p2pHostDisband();
-    else p2pLeave();
+    p2pExitRoom();
     return;
   }
   endGameCleanup();

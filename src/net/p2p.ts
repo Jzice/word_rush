@@ -46,7 +46,10 @@ export let peer: any = null,
   roomEnded: any = false; // 本轮是否已结束（防重复结算）
 let p2pSelBook: any = "mix", // 房主选定的对战词库（"mix" 或词库 id）
   p2pRoundWords: any = null, // 本局统一词表（房主生成，随 start 消息分发给所有人）
-  p2pStarting: any = false; // 房主开局去重（异步加载词库期间防重复点击）
+  p2pStarting: any = false, // 房主开局去重（异步加载词库期间防重复点击）
+  p2pResultOpen: any = false, // 一局结算弹窗展示中（避免成员广播覆盖结算）
+  p2pConfirming: any = false, // 离开房间的二次确认弹窗展示中
+  p2pLeavePrevHtml: any = ""; // 离开确认前的弹窗内容，取消时还原
 const ROOM_SEC = 60; // 乱斗每轮限时（秒）
 const P2P_WORD_COUNT = 8; // 每局对战单词数
 
@@ -229,6 +232,7 @@ export function p2pJoinRoom(code: any) {
 }
 export function setupP2PConnection() {
   if (!conn) return;
+  const sessionPeer = peer; // 记录本次会话的 peer，避免旧连接回调误伤新房间
   conn.on("open", () => {
     const st = $("#p2pStatus");
     if (st)
@@ -251,30 +255,33 @@ export function setupP2PConnection() {
     p2pReady = false;
     p2pRematchMe = false;
     p2pRematchFoe = false;
-    // 对局进行中对手断开：本局不结算
+    // 主动退出（peer 已销毁）或已新建房间时，忽略旧连接触发的 close 回调
+    if (!peer || peer !== sessionPeer) return;
+    // 对局进行中对手断开：本局不结算；房主保留房间等待新对手，不主动退出
     if (G && G.type === "p2p" && G.active) {
       endGameCleanup();
       setG(null);
+      if (isHost) oppProfile = null;
       openModal(
-        `<h3>🔌 连接断开</h3><div class="sub">对方已退出，本局不结算</div><div class="mbtns"><button class="btn b" ${dataAct('closeModalGoHome')}>返回主页</button></div>`
+        `<h3>🔌 连接断开</h3><div class="sub">对方已退出，本局不结算${
+          isHost ? "；房间仍保留，可返回大厅等待新对手" : ""
+        }</div><div class="mbtns">${
+          isHost
+            ? `<button class="btn c" ${dataAct('p2pBackToLobby')}>🏠 返回房间大厅</button><button class="btn p" ${dataAct('p2pHostDisband')}>🚪 解散房间</button>`
+            : `<button class="btn b" ${dataAct('p2pLeave')}>🏠 返回主页</button>`
+        }</div>`
       );
       return;
     }
-    // 对局已结束（大厅内）：房主保留房间等待新对手，加入者直接退回主页
+    // 对局已结束：房主保留房间等待新对手；客人由用户点按钮后再离开并结算
     if (isHost && peer) {
       toast("👋 对手已退出，房间等待中");
       oppProfile = null;
     } else {
       toast("🚪 房间已关闭");
-      if (peer) {
-        try {
-          peer.destroy();
-        } catch (e) {}
-        peer = null;
-      }
-      p2pCleanup();
-      closeModal();
-      go("scr-home");
+      openModal(
+        `<h3>🔌 房间已关闭</h3><div class="sub">房主已解散房间，无法继续对战；离开时结算本场奖励。</div><div class="mbtns"><button class="btn b" ${dataAct('p2pLeave')}>🏠 返回主页</button></div>`
+      );
     }
   });
 }
@@ -297,7 +304,7 @@ export function p2pDuelLobby() {
        <div class="room-mem"><span id="duelOppNm">⏳ 等待对手加入...</span><b id="duelOppSt"></b></div>
      </div>
      <div class="sub" style="margin-bottom:8px">选择词库（双方使用同一组词）：</div><div class="optrow" id="duelBkOpts" style="justify-content:center">${p2pBookOpts()}</div>
-     <div class="mbtns"><button class="btn y" ${dataAct('p2pHostStartDuel')}>⚔️ 开始对战</button><button class="btn p" ${dataAct('p2pHostDisband')}>🚪 解散房间</button></div>`
+     <div class="mbtns"><button class="btn y" ${dataAct('p2pHostStartDuel')}>⚔️ 开始对战</button><button class="btn p" ${dataAct('p2pConfirmLeave')}>🚪 解散房间</button></div>`
   );
   p2pBindBookOpts("#duelBkOpts");
   if (oppProfile) {
@@ -316,7 +323,7 @@ export function p2pDuelWaiting() {
        <div class="room-mem"><span id="duelOppNm">🏠 房主</span><b>选词中...</b></div>
        <div class="room-mem"><span>${me.avatar || "🧑"} ${escHtml(me.name || "你")}（我）</span><b style="color:var(--ok)">已就绪</b></div>
      </div>
-     <div class="mbtns"><button class="btn b" ${dataAct('p2pLeave')}>🏠 退出房间</button></div>`
+     <div class="mbtns"><button class="btn b" ${dataAct('p2pConfirmLeave')}>🚪 退出房间</button></div>`
   );
 }
 let p2pData: any = {
@@ -331,6 +338,9 @@ let p2pData: any = {
 export function startP2PBattle() {
   endGameCleanup();
   closeModal();
+  p2pResultOpen = false;
+  p2pConfirming = false;
+  p2pLeavePrevHtml = "";
   // 词表由房主统一生成并随 start 消息分发；兜底：未收到时本地随机生成
   let q = p2pRoundWords;
   if (!q || !q.length) {
@@ -572,14 +582,13 @@ export function handleP2PData(data: any) {
   }
   if (data.type === "rematch") {
     p2pRematchFoe = true;
-    if (isHost) {
-      // 房主权威：双方都点了再来一局 → 房主生成统一词表开局
-      if (p2pRematchMe) p2pHostStartDuel();
-    } else {
-      const b = $("#btnRematch");
-      if (b)
-        b.innerHTML = p2pRematchMe ? "⏳ 已准备，等待房主开局..." : "✅ 接受再来一局";
-    }
+    // 房主权威：双方都点了再来一局 → 房主生成统一词表开局
+    if (isHost && p2pRematchMe) p2pHostStartDuel();
+    else p2pRenderRematchBtn();
+  }
+  if (data.type === "rematch_cancel") {
+    p2pRematchFoe = false;
+    p2pRenderRematchBtn();
   }
   if (data.type === "start") {
     // 客人收到房主开局：使用房主分发的统一词表
@@ -628,9 +637,14 @@ export function endP2PBattle(win: any) {
   const lvA = lvl(S.xp),
     up = lvA.lv > lvB.lv;
   const foeN = oppProfile && oppProfile.name ? oppProfile.name : "对手";
-  const roomBtns = isHost
-    ? `<button class="btn y" id="btnRematch" ${dataAct('p2pRequestRematch')}>🔁 再来一局</button><button class="btn p" ${dataAct('p2pHostDisband')}>🚪 解散房间</button>`
-    : `<button class="btn y" id="btnRematch" ${dataAct('p2pRequestRematch')}>🔁 再来一局</button><button class="btn b" ${dataAct('p2pLeave')}>🏠 返回主页</button>`;
+  // 一局结束后保留房间：可再来一局、回大厅继续，或显式退出（二次确认）
+  const roomBtns =
+    `<button class="btn y" id="btnRematch" ${dataAct('p2pRequestRematch')}>🔁 再来一局</button>` +
+    `<button class="btn c" ${dataAct('p2pBackToLobby')}>🏠 返回房间大厅</button>` +
+    (isHost
+      ? `<button class="btn p" ${dataAct('p2pConfirmLeave')}>🚪 解散房间</button>`
+      : `<button class="btn b" ${dataAct('p2pConfirmLeave')}>🚪 退出房间</button>`);
+  p2pResultOpen = true;
   openModal(
     `<div style="text-align:center"><div class="stamp">${
       win ? "🏆 胜利！" : "💔 惜败"
@@ -656,13 +670,34 @@ export function endP2PBattle(win: any) {
     words: [],
   };
 }
-/* ---------- 单挑：再来一局 / 解散 / 退出 ---------- */
-export function p2pRequestRematch() {
-  if (p2pRematchMe || !conn) return;
-  p2pRematchMe = true;
+/* ---------- 单挑：再来一局 / 返回大厅 / 退出 ---------- */
+/* 结算页「再来一局」可再点一次取消，避免单方不点导致双方卡在等待状态 */
+function p2pRenderRematchBtn() {
   const b = $("#btnRematch");
-  if (b) b.innerHTML = "⏳ 等待对方确认...";
+  if (!b) return;
+  b.innerHTML = p2pRematchMe
+    ? p2pRematchFoe
+      ? "⏳ 双方已准备..."
+      : "⏳ 等待对方确认...（点击取消）"
+    : p2pRematchFoe
+    ? "✅ 接受再来一局"
+    : "🔁 再来一局";
+}
+export function p2pCancelRematch() {
+  if (!p2pRematchMe) return;
+  p2pRematchMe = false;
+  sendP2P({ type: "rematch_cancel" });
+  p2pRenderRematchBtn();
+}
+export function p2pRequestRematch() {
+  if (!conn) return;
+  if (p2pRematchMe) {
+    p2pCancelRematch();
+    return;
+  }
+  p2pRematchMe = true;
   sendP2P({ type: "rematch" });
+  p2pRenderRematchBtn();
   // 房主：若对方也已准备，立即生成统一词表开局
   if (isHost && p2pRematchFoe) p2pHostStartDuel();
 }
@@ -685,6 +720,9 @@ export function p2pCleanup() {
   p2pSelBook = "mix";
   p2pRoundWords = null;
   p2pStarting = false;
+  p2pResultOpen = false;
+  p2pConfirming = false;
+  p2pLeavePrevHtml = "";
 }
 export function p2pLeave() {
   if (G && G.type === "p2p") {
@@ -730,6 +768,92 @@ export function p2pHostDisband() {
     go("scr-home");
     toast("🚪 房间已解散");
   }, 200);
+}
+/* ---------- 一局结束后继续玩：返回大厅 / 离开房间二次确认 ---------- */
+export function p2pInRoom() {
+  return !!(peer && p2pMode);
+}
+/* 是否还能继续留在房间（客人需连接仍在线） */
+function p2pCanStay() {
+  return isHost ? !!peer : !!(peer && conn && conn.open);
+}
+/* 返回房间大厅：不销毁连接、不清成员与累计积分，只复位本局状态 */
+export function p2pBackToLobby() {
+  if (!p2pInRoom()) {
+    closeModal();
+    go("scr-home");
+    return;
+  }
+  if (!p2pCanStay()) {
+    openModal(
+      `<h3>🔌 连接已断开</h3><div class="sub">与房间的连接已断开，无法继续下一局；离开时结算本场奖励。</div><div class="mbtns"><button class="btn b" ${dataAct('p2pLeave')}>🏠 返回主页</button></div>`
+    );
+    return;
+  }
+  p2pResultOpen = false;
+  p2pConfirming = false;
+  p2pLeavePrevHtml = "";
+  p2pRematchMe = false;
+  p2pRematchFoe = false;
+  if (p2pMode === "duel" && conn && conn.open) sendP2P({ type: "rematch_cancel" });
+  if (p2pMode === "room") {
+    p2pState = "lobby";
+    roomResults = {};
+    roomEnded = false;
+    for (const m of Object.values(members) as any[]) {
+      m.done = false;
+      m.time = 0;
+      m.prog = 0;
+      m.errors = 0;
+      m.correct = 0;
+    }
+    if (isHost) roomBroadcastMembers();
+  }
+  if (p2pMode === "room") roomRenderLobby();
+  else if (isHost) p2pDuelLobby();
+  else p2pDuelWaiting();
+}
+/* 回主页 / 退出 / 解散：二次确认，明确告知将离开房间并结算奖励 */
+export function p2pConfirmLeave() {
+  if (p2pConfirming) return;
+  if (!p2pInRoom()) {
+    closeModal();
+    go("scr-home");
+    return;
+  }
+  p2pLeavePrevHtml = modalOpen ? $("#mbox").innerHTML : "";
+  p2pConfirming = true;
+  const score =
+    p2pMode === "room"
+      ? `<div class="sub">本场累计 ⭐${roomScores[myPeerId] || 0} 分，离开时兑换金币与经验。</div>`
+      : "";
+  openModal(
+    `<h3>🚪 离开联机房间？</h3><div class="sub">返回主页将${
+      isHost ? "解散房间并" : ""
+    }退出当前房间，之后无法继续下一局。</div>${score}<div class="mbtns"><button class="btn c" ${dataAct('p2pCancelLeave')}>继续留在房间</button><button class="btn p" ${dataAct('p2pExitRoom')}>确认离开</button></div>`
+  );
+}
+/* 取消离开：还原确认前的弹窗；若确认前没有弹窗则回房间大厅 */
+export function p2pCancelLeave() {
+  p2pConfirming = false;
+  if (p2pLeavePrevHtml) {
+    openModal(p2pLeavePrevHtml);
+    p2pBindBookOpts("#duelBkOpts");
+    p2pBindBookOpts("#roomBkOpts");
+    p2pLeavePrevHtml = "";
+  } else p2pBackToLobby();
+}
+/* 真正离开：房主解散（广播 disband），客人退出；两者都会做乱斗最终结算 */
+export function p2pExitRoom() {
+  p2pConfirming = false;
+  p2pLeavePrevHtml = "";
+  if (isHost) p2pHostDisband();
+  else p2pLeave();
+}
+/* Esc/✕：结算或大厅弹窗期间再按一次即取消离开，否则先弹二次确认 */
+export function p2pHandleEsc() {
+  if (p2pConfirming) p2pCancelLeave();
+  else p2pConfirmLeave();
 }
 export function endP2PBattleCleanup() {
   if (G && G.type === "p2p") {
@@ -801,6 +925,7 @@ export function roomJoin(code: any) {
 }
 export function roomSetupConnection() {
   if (!conn) return;
+  const sessionPeer = peer; // 记录本次会话的 peer，避免旧连接回调误伤新房间
   conn.on("open", () => {
     p2pReady = true;
     $("#p2pStatus").innerHTML =
@@ -812,18 +937,19 @@ export function roomSetupConnection() {
   conn.on("close", () => {
     conn = null;
     p2pReady = false;
-    if (G && G.type === "p2p" && G.active) {
+    // 主动退出（peer 已销毁）或已新建房间时，忽略旧连接触发的 close 回调
+    if (!peer || peer !== sessionPeer) return;
+    const inGame = !!(G && G.type === "p2p" && G.active);
+    if (inGame) {
       endGameCleanup();
       setG(null);
-      openModal(
-        `<h3>🔌 连接断开</h3><div class="sub">与房主的连接已断开，本局不结算</div><div class="mbtns"><button class="btn b" ${dataAct('closeModalGoHome')}>返回主页</button></div>`
-      );
-      return;
     }
-    toast("🚪 已退出房间");
-    p2pCleanup();
-    closeModal();
-    go("scr-home");
+    // 连接断开不主动清理房间状态：由用户点「返回主页」再走 p2pLeave 结算本场积分
+    openModal(
+      `<h3>🔌 连接断开</h3><div class="sub">${
+        inGame ? "与房主的连接已断开，本局不结算；" : "与房间的连接已断开；"
+      }离开时结算本场累计积分。</div><div class="mbtns"><button class="btn b" ${dataAct('p2pLeave')}>🏠 返回主页</button></div>`
+    );
   });
 }
 export function roomBindConn(c: any) {
@@ -894,6 +1020,8 @@ export function roomHandleData(d: any) {
     (d.members || []).forEach((m: any) => (members[m.id] = m));
     roomScores = d.scores || roomScores;
     p2pState = d.playing ? "playing" : "lobby";
+    // 结算弹窗期间只同步数据，不覆盖结算页（一局结束后仍留在房间）
+    if (p2pResultOpen) return;
     if (isHost && (wasPlaying || p2pState === "playing")) roomRenderLanes();
     else roomRenderLobby();
   } else if (d.type === "full") {
@@ -999,6 +1127,11 @@ export function roomEndRound(results: any) {
   if (!G || G.type !== "p2p" || !G.active) return;
   endGameCleanup();
   if (G && G.iv) clearInterval(G.iv);
+  // 本轮状态复位，累计积分 roomScores / 连接 / 成员全部保留，可继续下一局
+  p2pResultOpen = true;
+  p2pState = "lobby";
+  roomResults = {};
+  roomEnded = false;
   // 排名：完成者按用时升序，未完成者排最后
   const N = Object.keys(members).length;
   const rows: any[] = [];
@@ -1037,9 +1170,15 @@ export function roomEndRound(results: any) {
       : myRank && myRank.sc > 0
       ? `🥈 第 ${myRank.rank} 名`
       : "💔 本轮未完成";
-  const btns = isHost
-    ? `<button class="btn y" ${dataAct('roomStartGame')}>🎮 再来一局</button><button class="btn p" ${dataAct('p2pHostDisband')}>🚪 解散房间</button>`
-    : `<div class="sub">等待房主开始下一局...</div><button class="btn b" ${dataAct('p2pLeave')}>🏠 退出房间</button>`;
+  // 一局结束后保留房间：回大厅看累计积分、再来一局，或显式退出（二次确认）
+  const btns =
+    (isHost
+      ? `<button class="btn y" ${dataAct('roomStartGame')}>🎮 再来一局</button>`
+      : `<div class="sub" style="width:100%">可返回房间大厅查看累计积分，或等待房主开始下一局...</div>`) +
+    `<button class="btn c" ${dataAct('p2pBackToLobby')}>🏠 返回房间大厅</button>` +
+    (isHost
+      ? `<button class="btn p" ${dataAct('p2pConfirmLeave')}>🚪 解散房间</button>`
+      : `<button class="btn b" ${dataAct('p2pConfirmLeave')}>🚪 退出房间</button>`);
   openModal(
     `<div style="text-align:center"><div class="stamp">${stamp}</div><div class="sub">本轮用时排名 · +${mySc} 分</div><div class="room-list" style="text-align:left">${rankRows}</div><div class="mbtns">${btns}</div></div>`
   );
@@ -1074,18 +1213,18 @@ export function roomRenderLobby() {
     })
     .join("");
   const head = isHost
-    ? `<div class="sub" style="margin:12px 0 6px">选择词库（全体成员使用同一组词）：</div><div class="optrow" id="roomBkOpts" style="justify-content:center;margin-bottom:8px">${p2pBookOpts()}</div><div class="mbtns" style="margin-top:8px"><button class="btn y" ${dataAct('roomStartGame')}>🎮 开始对战（${list.length}/${roomMax}）</button><button class="btn p" ${dataAct('p2pHostDisband')}>🚪 解散房间</button></div>`
+    ? `<div class="sub" style="margin:12px 0 6px">选择词库（全体成员使用同一组词）：</div><div class="optrow" id="roomBkOpts" style="justify-content:center;margin-bottom:8px">${p2pBookOpts()}</div><div class="mbtns" style="margin-top:8px"><button class="btn y" ${dataAct('roomStartGame')}>🎮 开始对战（${list.length}/${roomMax}）</button><button class="btn p" ${dataAct('p2pConfirmLeave')}>🚪 解散房间</button></div>`
     : `<div class="sub">${
         p2pState === "playing"
           ? "🎮 对局进行中，等待下一局开始..."
           : "⏳ 等待房主选词并开始对战..."
-      }</div><div class="mbtns" style="margin-top:14px"><button class="btn b" ${dataAct('p2pLeave')}>🏠 退出房间</button></div>`;
+      }</div><div class="mbtns" style="margin-top:14px"><button class="btn b" ${dataAct('p2pConfirmLeave')}>🚪 退出房间</button></div>`;
   openModal(
     `<h3>🏠 房间 <span class="room-code" style="font-size:1.15rem;letter-spacing:2px;padding:2px 12px">${p2pRoom}</span></h3><div class="sub">${
       isHost ? "你是房主" : "已加入房间"
     } · 上限 ${roomMax} 人 · 房主可随时开始</div>${p2pShareBtns("room")}<div class="room-list" id="roomLobby">${
       rows || '<div class="sub" style="padding:8px">等待成员加入...</div>'
-    }</div>${head}`
+    }</div><div class="sub" style="margin:8px 0 0">⭐ 为房间累计积分，退出房间时兑换金币与经验</div>${head}`
   );
   if (isHost) p2pBindBookOpts("#roomBkOpts");
 }
@@ -1185,6 +1324,10 @@ registerAct("p2pJoinRoom", (_el: any, _ev: any, args: any[]) => (p2pJoinRoom as 
 
 
 registerAct("p2pRequestRematch", (_el: any, _ev: any, args: any[]) => (p2pRequestRematch as any)(...(args || [])));
+registerAct("p2pBackToLobby", (_el: any, _ev: any, args: any[]) => (p2pBackToLobby as any)(...(args || [])));
+registerAct("p2pConfirmLeave", (_el: any, _ev: any, args: any[]) => (p2pConfirmLeave as any)(...(args || [])));
+registerAct("p2pCancelLeave", (_el: any, _ev: any, args: any[]) => (p2pCancelLeave as any)(...(args || [])));
+registerAct("p2pExitRoom", (_el: any, _ev: any, args: any[]) => (p2pExitRoom as any)(...(args || [])));
 
 registerAct("p2pLeave", (_el: any, _ev: any, args: any[]) => (p2pLeave as any)(...(args || [])));
 registerAct("p2pHostDisband", (_el: any, _ev: any, args: any[]) => (p2pHostDisband as any)(...(args || [])));
